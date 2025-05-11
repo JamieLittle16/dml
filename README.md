@@ -75,6 +75,10 @@ some_command | dml [OPTIONS]
 
 *   `--colour COLOR`: Set the text colour for rendered LaTeX images. `COLOR` can be a named colour (e.g., "red", "blue") or a hex code (e.g., "#FF0000", "#0F0"). Defaults to "white".
 *   `-c COLOR`: Short alias for `--colour`. If both are provided, `-c` takes precedence.
+*   `--size SIZE`: Set the target terminal row height for rendered LaTeX images. `SIZE` is an integer. A value of `0` (default) uses 1 row for inline math and auto-sizes display math.
+*   `-s SIZE`: Short alias for `--size`. If both are provided, `-s` takes precedence.
+*   `--dpi DPI_VALUE`: Set the DPI (dots per inch) for rendering LaTeX images. `DPI_VALUE` is an integer. Defaults to `300`. Higher values produce sharper images but may be slower.
+*   `-d DPI_VALUE`: Short alias for `--dpi`. If both are provided, `-d` takes precedence.
 *   `--help` / `-h`: Displays help information about flags. (Standard Go flag behavior, prints to stderr).
 
 **Examples:**
@@ -98,7 +102,17 @@ some_command | dml [OPTIONS]
     echo 'Display math: $$ \sum_{i=1}^{n} i = \frac{n(n+1)}{2} $$' | dml -c "#00FF00"
     ```
 
-4.  **Viewing the man page (after installation):**
+4.  **Render inline LaTeX image with a specific height (e.g., 2 terminal rows):**
+    ```bash
+    echo \'This is an inline formula $x^2$ sized to 2 rows.\' | dml -s 2
+    ```
+
+5.  **Render display math with a custom DPI (e.g., 150 DPI):**
+    ```bash
+    echo 'Display math at 150 DPI: $$ \int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2} $$' | dml --dpi 150
+    ```
+
+6.  **Viewing the man page (after installation):**
     ```bash
     man dml
     ```

@@ -1,4 +1,4 @@
-module dsp
+module dml
 
 go 1.18
 

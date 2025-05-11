@@ -33,6 +33,25 @@ Defaults to "white".
 \fB-c\fR \fICOLOR\fR
 Short alias for \fB--colour\fR. If both are provided, \fB-c\fR takes precedence.
 .TP
+\fB--size\fR \fISIZE\fR
+Set the target terminal row height for rendered LaTeX images.
+\fISIZE\fR is an integer. A value of \fB0\fR (default) uses 1 row for inline math
+and attempts to auto-size display math according to the terminal's perception
+of the image's aspect ratio. Specific positive integers (e.g., 1, 2, 3)
+request the image be scaled to that many terminal cell rows.
+.TP
+\fB-s\fR \fISIZE\fR
+Short alias for \fB--size\fR. If both are provided, \fB-s\fR takes precedence.
+.TP
+\fB--dpi\fR \fIDPI_VALUE\fR
+Set the DPI (dots per inch) for rendering LaTeX images.
+\fIDPI_VALUE\fR is an integer. Defaults to \fB300\fR.
+Higher values produce sharper images but may increase processing time and image size.
+Use a value like \fB150\fR for lower resolution, or \fB600\fR for higher resolution.
+.TP
+\fB-d\fR \fIDPI_VALUE\fR
+Short alias for \fB--dpi\fR. If both are provided, \fB-d\fR takes precedence.
+.TP
 \fB--help\fR, \fB-h\fR
   (Note: Standard Go flag behavior; prints usage to stderr and exits.)
 .SH EXIT STATUS
@@ -53,6 +72,16 @@ Pipe output from another command:
 .RS
 .B echo '**Important:** $E=mc^2$' | dml --colour green
 .RE
+.TP
+Render inline math at a specific height (e.g., 2 terminal rows):
+.RS
+.B echo 'An inline formula $x^2$ sized to 2 rows.' | dml -s 2
+.RE
+.TP
+Render display math with a custom DPI (e.g., 150 DPI):
+.RS
+.B echo 'Display math at 150 DPI: $$ \\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2} $$' | dml --dpi 150
+.RE
 .SH PREREQUISITES
 .TP
 \fBpdflatex\fR
@@ -64,6 +93,6 @@ Pipe output from another command:
 \fBKitty Terminal (or compatible)\fR
   Required to display the rendered images, as dml uses the Kitty graphics protocol.
 .SH AUTHOR
-Your Name <you@example.com> (Update with your details)
+Jamie Little
 .SH SEE ALSO
 groff(1), man(1), pdflatex(1), convert(1)

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"flag"
 	"fmt"
@@ -17,11 +16,14 @@ import (
 )
 
 var (
-    inlineMath  = regexp.MustCompile(`\$(.+?)\$`)
-    	displayMath = regexp.MustCompile(`\$\$(.+?)\$\$`)
-    )
+	// Added (?s) to make '.' match newlines for multi-line LaTeX expressions.
+	inlineMath         = regexp.MustCompile(`(?s)\$(.+?)\$`)
+	displayMath        = regexp.MustCompile(`(?s)\$\$(.+?)\$\$`)
+	    inlineMathParen    = regexp.MustCompile(`(?s)\\\((.+?)\\\)`)    // For \( ... \)
+	    displayMathBracket = regexp.MustCompile(`(?s)\\\[(.+?)\\\]`) // For \[ ... \]
+)
 
-    func renderMath(latex string, color string) ([]byte, error) {
+func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, error) {
     	var colorCmd string
     	if strings.HasPrefix(color, "#") {
     		colorCmd = fmt.Sprintf(`\color[HTML]{%s}`, strings.TrimPrefix(color, "#"))
@@ -29,13 +31,23 @@ var (
     		colorCmd = fmt.Sprintf(`\color{%s}`, color)
     	}
 
-    	// 1. Write minimal LaTeX document
-    	tex := fmt.Sprintf(`\documentclass[preview]{standalone}
-    \usepackage{amsmath}
-    \usepackage{xcolor}
-    \begin{document}
-    %s$%s$
-    \end{document}`, colorCmd, latex)
+    	var texTemplate string
+    	if isDisplay {
+    		texTemplate = `\documentclass[preview]{standalone}
+	\usepackage{amsmath}
+	\usepackage{xcolor}
+	\begin{document}
+	%s\[%s\]
+	\end{document}`
+    	} else {
+    		texTemplate = `\documentclass[preview]{standalone}
+	\usepackage{amsmath}
+	\usepackage{xcolor}
+	\begin{document}
+	%s$%s$
+	\end{document}`
+    	}
+    	tex := fmt.Sprintf(texTemplate, colorCmd, latex)
 
     	dir, err := ioutil.TempDir("", "dtsplay")
     if err != nil {
@@ -63,7 +75,7 @@ var (
     pngFile := dir + "/eq.png"
     stdout.Reset() // Clear stdout buffer for the convert command
     stderr.Reset() // Clear stderr buffer for the convert command
-    cmd = exec.Command("convert", "-density", "300", pdfFile, pngFile)
+    cmd = exec.Command("convert", "-density", fmt.Sprintf("%d", dpi), pdfFile, pngFile)
     cmd.Stdout = &stdout
     cmd.Stderr = &stderr
     if err := cmd.Run(); err != nil {
@@ -88,23 +100,44 @@ var (
     return imgData, nil
 }
 
-func kittyInline(img []byte) (string, error) {
-    // Use rasterm to emit Kitty protocol via stdout
+// kittyInline generates the Kitty graphics protocol string for the given image bytes.
+func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, error) {
     var sb strings.Builder
     opts := rasterm.KittyImgOpts{
         // Available fields in v1.1.1:
         // SrcX, SrcY, SrcWidth, SrcHeight, CellOffsetX, CellOffsetY,
         // DstCols, DstRows, ZIndex, ImageId, ImageNo, PlacementId
         // TransferMode and UseWindowSize are not available in this version.
-        // Add any desired valid options here.
     }
-    // KittyCopyPNGInline expects an io.Reader for the image data.
-    // We capture the output into a string builder instead of writing to os.Stdout directly.
+
+    actualDstRows := 0
+    if userTargetRows > 0 {
+        actualDstRows = userTargetRows
+    } else { // User did not specify a size, use our defaults
+        if isDisplayMath {
+            // For display math, 0 might let rasterm/kitty decide size, or pick a larger default.
+            // Let's use 0 for auto-sizing display math by default if not specified.
+            actualDstRows = 0
+        } else { // Inline math
+            actualDstRows = 1 // Default to 1 row for inline math
+        }
+    }
+
+    if actualDstRows > 0 {
+        opts.DstRows = uint32(actualDstRows)
+    }
+
+    // rasterm.KittyCopyPNGInline expects an io.Reader for the image data.
+    // We capture its output (the Kitty protocol string) into a strings.Builder.
     err := rasterm.KittyCopyPNGInline(&sb, bytes.NewReader(img), opts)
     if err != nil {
         return "", err
     }
-    	return sb.String(), nil
+    kittyStr := sb.String()
+    if isDisplayMath {
+        kittyStr += "\n" // Add a newline after display math images
+    }
+    	return kittyStr, nil
     }
 
     // renderMarkdownAST recursively traverses the AST and builds a string with ANSI codes.
@@ -166,63 +199,122 @@ func kittyInline(img []byte) (string, error) {
 
     func main() {
 	// Command-line flags
-	colourFlag := flag.String("colour", "white", "Set LaTeX text colour (e.g., red, #00FF00).") // Note: default flag name is "colour"
+	colourFlag := flag.String("colour", "white", "Set LaTeX text colour (e.g., red, #00FF00).")
 	cFlag := flag.String("c", "", "Short alias for --colour. Overrides --colour if set.")
+	sizeFlag := flag.Int("size", 0, "Target terminal rows for LaTeX images (0 for default: 1 for inline, auto for display).")
+	sFlag := flag.Int("s", 0, "Short alias for --size.")
+	dpiFlag := flag.Int("dpi", 300, "Set DPI for rendering LaTeX images.")
+	dFlag := flag.Int("d", 0, "Short alias for --dpi. Overrides --dpi if set (and not 0).")
 	flag.Parse()
 
 	// Determine the effective color to use
 	effectiveColor := *colourFlag
-	// If -c was provided (i.e., it's not its default empty string), it takes precedence.
 	if *cFlag != "" {
 		effectiveColor = *cFlag
 	}
 
-	scanner := bufio.NewScanner(os.Stdin)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Step 1: Process LaTeX for rendering to Kitty protocol strings
-		// Process display-math blocks ($$...$$) first
-		line = displayMath.ReplaceAllStringFunc(line, func(match string) string {
-			content := match[2 : len(match)-2] // Extract LaTeX content for display math
-			img, err := renderMath(content, effectiveColor)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error rendering display math '%s': %v\n", content, err)
-				return match // Return original LaTeX string if rendering fails
-			}
-			kittyStr, err := kittyInline(img)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for display math '%s': %v\n", content, err)
-				return match // Return original LaTeX string if Kitty protocol generation fails
-			}
-			return kittyStr // Replace LaTeX with Kitty image protocol string
-		})
-
-		// Process inline-math snippets ($...$) next
-		line = inlineMath.ReplaceAllStringFunc(line, func(match string) string {
-			content := match[1 : len(match)-1] // Extract LaTeX content for inline math
-			img, err := renderMath(content, effectiveColor)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error rendering inline math '%s': %v\n", content, err)
-				return match // Return original LaTeX string if rendering fails
-			}
-			kittyStr, err := kittyInline(img)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math '%s': %v\n", content, err)
-				return match // Return original LaTeX string if Kitty protocol generation fails
-			}
-			return kittyStr // Replace LaTeX with Kitty image protocol string
-		})
-
-		// Step 2: Apply Markdown formatting (italics, bold) to the line,
-		// which now contains text and Kitty protocol strings from rendered LaTeX.
-		line = applyMarkdownFormatting(line)
-
-		// Print the fully processed line.
-		fmt.Println(line)
+	// Determine the effective size to use
+	effectiveSize := *sizeFlag
+	if *sFlag != 0 { // If -s was used (and not explicitly set to its default 0)
+		effectiveSize = *sFlag
 	}
-	if err := scanner.Err(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error from scanner: %v\n", err)
+	if effectiveSize < 0 { // Treat negative size as default
+		effectiveSize = 0
 	}
+
+	// Determine the effective DPI to use
+	effectiveDPI := *dpiFlag
+	if *dFlag != 0 { // If -d was used and not its default 0
+		effectiveDPI = *dFlag
+	}
+	if effectiveDPI <= 0 { // Ensure DPI is positive, default to 300 if invalid
+		effectiveDPI = 300
+	}
+
+	// Read all of stdin into a single string
+	inputBytes, err := ioutil.ReadAll(os.Stdin)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading standard input: %v\n", err)
+		os.Exit(1)
+	}
+	line := string(inputBytes)
+
+	// Step 1: Process LaTeX for rendering to Kitty protocol strings
+	// Process display-math blocks ($$...$$) first
+	line = displayMath.ReplaceAllStringFunc(line, func(match string) string {
+		content := match[2 : len(match)-2] // Extract LaTeX content for display math
+		img, err := renderMath(content, effectiveColor, true, effectiveDPI)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error rendering display math ('%s'): %v\n", content, err)
+			return match
+		}
+		kittyStr, err := kittyInline(img, true, effectiveSize)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for display math ('%s'): %v\n", content, err)
+			return match // Return original LaTeX string if Kitty protocol generation fails
+		}
+		return kittyStr // Replace LaTeX with Kitty image protocol string
+	})
+
+	// Process display-math blocks (\[...\])
+	line = displayMathBracket.ReplaceAllStringFunc(line, func(match string) string {
+		// Extract content from between \\[ and \\]
+		content := strings.TrimSpace(match[2 : len(match)-2])
+		if content == "" { return match }
+		img, err := renderMath(content, effectiveColor, true, effectiveDPI) // Corrected: isDisplay is true
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error rendering display math ('%s'): %v\n", content, err) // Corrected: error message
+			return match
+		}
+		kittyStr, err := kittyInline(img, true, effectiveSize) // Corrected: isDisplayMath is true
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for display math ('%s'): %v\n", content, err) // Corrected: error message
+			return match
+		}
+		return kittyStr
+	})
+
+	// Process inline-math snippets ($...$)
+	line = inlineMath.ReplaceAllStringFunc(line, func(match string) string {
+		// Extract content from between $ and $
+		content := strings.TrimSpace(match[1 : len(match)-1])
+		if content == "" { return match }
+		img, err := renderMath(content, effectiveColor, false, effectiveDPI)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\n", content, err)
+			return match
+		}
+		kittyStr, err := kittyInline(img, false, effectiveSize) // Corrected: add effectiveSize
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\n", content, err)
+			return match
+		}
+		return kittyStr
+	})
+
+	// Process inline-math snippets (\\(...\\))
+	line = inlineMathParen.ReplaceAllStringFunc(line, func(match string) string {
+		// Extract content from between \\( and \\)
+		content := strings.TrimSpace(match[2 : len(match)-2])
+		if content == "" { return match }
+		img, err := renderMath(content, effectiveColor, false, effectiveDPI)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\n", content, err) // Corrected: error message
+			return match
+		}
+		kittyStr, err := kittyInline(img, false, effectiveSize) // Corrected: isDisplayMath is false
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\n", content, err) // Corrected: error message
+			return match
+		}
+		return kittyStr
+	})
+
+	// Step 2: Apply Markdown formatting (italics, bold) to the line,
+	// which now contains text and Kitty protocol strings from rendered LaTeX.
+	line = applyMarkdownFormatting(line)
+
+	// Print the fully processed line.
+	fmt.Println(line)
+	// Note: scanner.Err() is not applicable here as we read all input at once.
 }
