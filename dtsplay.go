@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	"github.com/BourgeoisBear/rasterm"
+	"github.com/gomarkdown/markdown/ast"
+	"github.com/gomarkdown/markdown/parser"
 )
 
 var (
@@ -102,28 +104,86 @@ func kittyInline(img []byte) (string, error) {
     if err != nil {
         return "", err
     }
-    return sb.String(), nil
-}
+    	return sb.String(), nil
+    }
 
-func main() {
+    // renderMarkdownAST recursively traverses the AST and builds a string with ANSI codes.
+    func renderMarkdownAST(node ast.Node, sb *strings.Builder) {
+    	if node == nil {
+    		return
+    	}
+
+    	switch n := node.(type) {
+    	case *ast.Text:
+    		sb.Write(n.Literal)
+    	case *ast.Emph: // Handles *italic* and _italic_
+    		sb.WriteString("\x1b[3m") // ANSI Italic on
+    		for _, child := range n.GetChildren() {
+    			renderMarkdownAST(child, sb)
+    		}
+    		sb.WriteString("\x1b[23m") // ANSI Italic off
+    	case *ast.Strong: // Handles **bold** and __bold__
+    		sb.WriteString("\x1b[1m") // ANSI Bold on
+    		for _, child := range n.GetChildren() {
+    			renderMarkdownAST(child, sb)
+    		}
+    		sb.WriteString("\x1b[22m") // ANSI Bold off
+    	// For common containers, just recurse on children.
+    	// This ensures their text content (including any nested Emph/Strong) is processed.
+    	case *ast.Document, *ast.Paragraph, *ast.List, *ast.ListItem, *ast.Link, *ast.Image,
+    		*ast.Code, *ast.CodeBlock, *ast.BlockQuote, *ast.Heading,
+    		*ast.HorizontalRule, *ast.HTMLBlock, *ast.HTMLSpan,
+    		*ast.Table, *ast.TableCell, *ast.TableHeader, *ast.TableRow,
+    		*ast.Math, *ast.MathBlock: // Include Math/MathBlock in case parser produces them
+    		for _, child := range n.GetChildren() {
+    			renderMarkdownAST(child, sb)
+    		}
+    	default:
+    		// For any other unhandled node type, if it's a container, process its children.
+    		// This is a general fallback. If specific rendering is needed for other
+    		// types, they should be added as explicit cases.
+    		// fmt.Fprintf(os.Stderr, "DEBUG: Unhandled AST Node type: %T\n", n) // Optional debug
+    		children := n.GetChildren()
+    		for _, child := range children {
+    			renderMarkdownAST(child, sb)
+    		}
+    	}
+    }
+
+    // applyMarkdownFormatting parses a line of Markdown text and converts basic
+    // styling (bold, italics) to ANSI escape codes.
+    func applyMarkdownFormatting(line string) string {
+    	// Standard parser, no special extensions enabled by default.
+    	// Extensions like parser.MathJax could be enabled if the Markdown
+    	// parser should explicitly create *ast.Math or *ast.MathBlock nodes.
+    	p := parser.New()
+    	docNode := p.Parse([]byte(line))
+
+    	var sb strings.Builder
+    	renderMarkdownAST(docNode, &sb)
+    	return sb.String()
+    }
+
+    func main() {
 	// Command-line flags
-	colourFlag := flag.String("colour", "white", "Set LaTeX text colour (e.g., red, #00FF00).")
-	cFlag := flag.String("c", "", "Short alias for --colour. Overrides --colour if provided.")
+	colourFlag := flag.String("colour", "white", "Set LaTeX text colour (e.g., red, #00FF00).") // Note: default flag name is "colour"
+	cFlag := flag.String("c", "", "Short alias for --colour. Overrides --colour if set.")
 	flag.Parse()
 
 	// Determine the effective color to use
 	effectiveColor := *colourFlag
-	// Check if the short flag -c was explicitly set.
-	// If -c is provided, it overrides the value from --colour.
+	// If -c was provided (i.e., it's not its default empty string), it takes precedence.
 	if *cFlag != "" {
 		effectiveColor = *cFlag
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
+
 	for scanner.Scan() {
 		line := scanner.Text()
 
-        // 1. Display-math first
+		// Step 1: Process LaTeX for rendering to Kitty protocol strings
+		// Process display-math blocks ($$...$$) first
 		line = displayMath.ReplaceAllStringFunc(line, func(match string) string {
 			content := match[2 : len(match)-2] // Extract LaTeX content for display math
 			img, err := renderMath(content, effectiveColor)
@@ -139,24 +199,30 @@ func main() {
 			return kittyStr // Replace LaTeX with Kitty image protocol string
 		})
 
-        		// 2. Inline-math next
-		        // 1. Display-math first
-		        		line = displayMath.ReplaceAllStringFunc(line, func(match string) string {
-		        			content := match[2 : len(match)-2]
-		        			img, err := renderMath(content, effectiveColor) // Use effectiveColor
-		        			if err != nil {
-		        				fmt.Fprintf(os.Stderr, "Error rendering display math '%s': %v\n", content, err)
-		        				return match // Return original match if rendering fails
-            }
-            kittyStr, err := kittyInline(img)
-            if err != nil {
-                fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math '%s': %v\n", content, err)
-                return match // Return original match if Kitty protocol generation fails
-            }
-            return kittyStr // Return the Kitty protocol string to be inserted inline
-        })
+		// Process inline-math snippets ($...$) next
+		line = inlineMath.ReplaceAllStringFunc(line, func(match string) string {
+			content := match[1 : len(match)-1] // Extract LaTeX content for inline math
+			img, err := renderMath(content, effectiveColor)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error rendering inline math '%s': %v\n", content, err)
+				return match // Return original LaTeX string if rendering fails
+			}
+			kittyStr, err := kittyInline(img)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math '%s': %v\n", content, err)
+				return match // Return original LaTeX string if Kitty protocol generation fails
+			}
+			return kittyStr // Replace LaTeX with Kitty image protocol string
+		})
 
-        // 3. Print any remaining Markdown
-        fmt.Println(line)
-    }
+		// Step 2: Apply Markdown formatting (italics, bold) to the line,
+		// which now contains text and Kitty protocol strings from rendered LaTeX.
+		line = applyMarkdownFormatting(line)
+
+		// Print the fully processed line.
+		fmt.Println(line)
+	}
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error from scanner: %v\n", err)
+	}
 }
