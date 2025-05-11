@@ -3,30 +3,39 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"flag"
 	"fmt"
-	"strings"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 
 	"github.com/BourgeoisBear/rasterm"
 )
 
 var (
     inlineMath  = regexp.MustCompile(`\$(.+?)\$`)
-    displayMath = regexp.MustCompile(`\$\$(.+?)\$\$`)
-)
+    	displayMath = regexp.MustCompile(`\$\$(.+?)\$\$`)
+    )
 
-func renderMath(latex string) ([]byte, error) {
-    // 1. Write minimal LaTeX document
-    tex := fmt.Sprintf(`\documentclass[preview]{standalone}
-\usepackage{amsmath}
-\begin{document}
-$%s$
-\end{document}`, latex)
+    func renderMath(latex string, color string) ([]byte, error) {
+    	var colorCmd string
+    	if strings.HasPrefix(color, "#") {
+    		colorCmd = fmt.Sprintf(`\color[HTML]{%s}`, strings.TrimPrefix(color, "#"))
+    	} else {
+    		colorCmd = fmt.Sprintf(`\color{%s}`, color)
+    	}
 
-    dir, err := ioutil.TempDir("", "dtsplay")
+    	// 1. Write minimal LaTeX document
+    	tex := fmt.Sprintf(`\documentclass[preview]{standalone}
+    \usepackage{amsmath}
+    \usepackage{xcolor}
+    \begin{document}
+    %s$%s$
+    \end{document}`, colorCmd, latex)
+
+    	dir, err := ioutil.TempDir("", "dtsplay")
     if err != nil {
         return nil, err
     }
@@ -97,17 +106,20 @@ func kittyInline(img []byte) (string, error) {
 }
 
 func main() {
-    scanner := bufio.NewScanner(os.Stdin)
-    for scanner.Scan() {
-        line := scanner.Text()
+	colorFlag := flag.String("colour", "white", "LaTeX text colour (name or #RRGGBB hex)")
+	flag.Parse()
+
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		line := scanner.Text()
 
         // 1. Display-math first
-        line = displayMath.ReplaceAllStringFunc(line, func(match string) string {
-            content := match[2 : len(match)-2]
-            img, err := renderMath(content)
-            if err != nil {
-                fmt.Fprintf(os.Stderr, "Error rendering display math '%s': %v\n", content, err)
-                return match // Return original match if rendering fails
+        		line = displayMath.ReplaceAllStringFunc(line, func(match string) string {
+        			content := match[2 : len(match)-2]
+        			img, err := renderMath(content, *colorFlag)
+        			if err != nil {
+        				fmt.Fprintf(os.Stderr, "Error rendering display math '%s': %v\n", content, err)
+        				return match // Return original match if rendering fails
             }
             kittyStr, err := kittyInline(img)
             if err != nil {
@@ -117,13 +129,13 @@ func main() {
             return kittyStr // Return the Kitty protocol string to be inserted inline
         })
 
-        // 2. Inline-math next
-        line = inlineMath.ReplaceAllStringFunc(line, func(match string) string {
-            content := match[1 : len(match)-1]
-            img, err := renderMath(content)
-            if err != nil {
-                fmt.Fprintf(os.Stderr, "Error rendering inline math '%s': %v\n", content, err)
-                return match // Return original match if rendering fails
+        		// 2. Inline-math next
+        		line = inlineMath.ReplaceAllStringFunc(line, func(match string) string {
+        			content := match[1 : len(match)-1]
+        			img, err := renderMath(content, *colorFlag)
+        			if err != nil {
+        				fmt.Fprintf(os.Stderr, "Error rendering inline math '%s': %v\n", content, err)
+        				return match // Return original match if rendering fails
             }
             kittyStr, err := kittyInline(img)
             if err != nil {
