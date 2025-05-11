@@ -106,36 +106,47 @@ func kittyInline(img []byte) (string, error) {
 }
 
 func main() {
-	colorFlag := flag.String("colour", "white", "LaTeX text colour (name or #RRGGBB hex)")
+	// Command-line flags
+	colourFlag := flag.String("colour", "white", "Set LaTeX text colour (e.g., red, #00FF00).")
+	cFlag := flag.String("c", "", "Short alias for --colour. Overrides --colour if provided.")
 	flag.Parse()
+
+	// Determine the effective color to use
+	effectiveColor := *colourFlag
+	// Check if the short flag -c was explicitly set.
+	// If -c is provided, it overrides the value from --colour.
+	if *cFlag != "" {
+		effectiveColor = *cFlag
+	}
 
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		line := scanner.Text()
 
         // 1. Display-math first
-        		line = displayMath.ReplaceAllStringFunc(line, func(match string) string {
-        			content := match[2 : len(match)-2]
-        			img, err := renderMath(content, *colorFlag)
-        			if err != nil {
-        				fmt.Fprintf(os.Stderr, "Error rendering display math '%s': %v\n", content, err)
-        				return match // Return original match if rendering fails
-            }
-            kittyStr, err := kittyInline(img)
-            if err != nil {
-                fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for display math '%s': %v\n", content, err)
-                return match // Return original match if Kitty protocol generation fails
-            }
-            return kittyStr // Return the Kitty protocol string to be inserted inline
-        })
+		line = displayMath.ReplaceAllStringFunc(line, func(match string) string {
+			content := match[2 : len(match)-2] // Extract LaTeX content for display math
+			img, err := renderMath(content, effectiveColor)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error rendering display math '%s': %v\n", content, err)
+				return match // Return original LaTeX string if rendering fails
+			}
+			kittyStr, err := kittyInline(img)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for display math '%s': %v\n", content, err)
+				return match // Return original LaTeX string if Kitty protocol generation fails
+			}
+			return kittyStr // Replace LaTeX with Kitty image protocol string
+		})
 
         		// 2. Inline-math next
-        		line = inlineMath.ReplaceAllStringFunc(line, func(match string) string {
-        			content := match[1 : len(match)-1]
-        			img, err := renderMath(content, *colorFlag)
-        			if err != nil {
-        				fmt.Fprintf(os.Stderr, "Error rendering inline math '%s': %v\n", content, err)
-        				return match // Return original match if rendering fails
+		        // 1. Display-math first
+		        		line = displayMath.ReplaceAllStringFunc(line, func(match string) string {
+		        			content := match[2 : len(match)-2]
+		        			img, err := renderMath(content, effectiveColor) // Use effectiveColor
+		        			if err != nil {
+		        				fmt.Fprintf(os.Stderr, "Error rendering display math '%s': %v\n", content, err)
+		        				return match // Return original match if rendering fails
             }
             kittyStr, err := kittyInline(img)
             if err != nil {
