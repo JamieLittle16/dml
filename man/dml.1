@@ -1,0 +1,69 @@
+.\" Manpage for dml(1)
+.TH DML 1 "May 2025" "v0.1" "User Commands"
+.SH NAME
+dml \- display Markdown (bold/italic) and LaTeX inline in the terminal via Kitty graphics protocol
+.SH SYNOPSIS
+.B dml
+[\fIOPTIONS\fR] < \fIFILE\fR
+.br
+\fIsome_command\fR | \fBdml\fR [\fIOPTIONS\fR]
+.SH DESCRIPTION
+.B dml
+reads text from standard input, processes it, and prints to standard output.
+It renders:
+.TP
+\fBMarkdown\fR
+  Basic Markdown styling:
+  \*Bbold\*B (\fB**bold**\fR or \fB__bold__\fR) text.
+  \*Iitalic\*I (\fI*italic*\fR or \fI_italic_\fR) text.
+.TP
+\fBLaTeX Math (as images)\fR
+  Inline math snippets (\fI$formula$\\fR).
+  Display math blocks (\fI$$formula$$\\fR).
+.LP
+Rendered LaTeX images are displayed using the Kitty terminal graphics protocol.
+Unrecognized Markdown syntax and other text are passed through as is.
+.SH OPTIONS
+.TP
+\fB--colour\fR \fICOLOR\fR
+Set the text colour for rendered LaTeX images.
+\fICOLOR\fR can be a named colour (e.g., "red", "blue") or a hex code (e.g., "#FF0000", "#0F0").
+Defaults to "white".
+.TP
+\fB-c\fR \fICOLOR\fR
+Short alias for \fB--colour\fR. If both are provided, \fB-c\fR takes precedence.
+.TP
+\fB--help\fR, \fB-h\fR
+  (Note: Standard Go flag behavior; prints usage to stderr and exits.)
+.SH EXIT STATUS
+.TP
+\fB0\fR
+  Success.
+.TP
+\fB\>0\fR
+  An error occurred (e.g., unable to render LaTeX, file issues).
+.SH EXAMPLES
+.TP
+Display a file containing Markdown and LaTeX:
+.RS
+.B dml < my_document.md
+.RE
+.TP
+Pipe output from another command:
+.RS
+.B echo '**Important:** $E=mc^2$' | dml --colour green
+.RE
+.SH PREREQUISITES
+.TP
+\fBpdflatex\fR
+  Required for compiling LaTeX. Part of TeX distributions (e.g., TeX Live, MiKTeX).
+.TP
+\fBconvert\fR
+  Required for converting PDFs to PNGs. Part of ImageMagick.
+.TP
+\fBKitty Terminal (or compatible)\fR
+  Required to display the rendered images, as dml uses the Kitty graphics protocol.
+.SH AUTHOR
+Your Name <you@example.com> (Update with your details)
+.SH SEE ALSO
+groff(1), man(1), pdflatex(1), convert(1)
