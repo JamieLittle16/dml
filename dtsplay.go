@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"strings"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -76,8 +77,9 @@ $%s$
     return imgData, nil
 }
 
-func kittyInline(img []byte) error {
+func kittyInline(img []byte) (string, error) {
     // Use rasterm to emit Kitty protocol via stdout
+    var sb strings.Builder
     opts := rasterm.KittyImgOpts{
         // Available fields in v1.1.1:
         // SrcX, SrcY, SrcWidth, SrcHeight, CellOffsetX, CellOffsetY,
@@ -86,7 +88,12 @@ func kittyInline(img []byte) error {
         // Add any desired valid options here.
     }
     // KittyCopyPNGInline expects an io.Reader for the image data.
-    return rasterm.KittyCopyPNGInline(os.Stdout, bytes.NewReader(img), opts)
+    // We capture the output into a string builder instead of writing to os.Stdout directly.
+    err := rasterm.KittyCopyPNGInline(&sb, bytes.NewReader(img), opts)
+    if err != nil {
+        return "", err
+    }
+    return sb.String(), nil
 }
 
 func main() {
@@ -102,11 +109,12 @@ func main() {
                 fmt.Fprintf(os.Stderr, "Error rendering display math '%s': %v\n", content, err)
                 return match // Return original match if rendering fails
             }
-            if err := kittyInline(img); err != nil {
-                fmt.Fprintf(os.Stderr, "Error displaying Kitty image for display math '%s': %v\n", content, err)
-                return match // Return original match if Kitty display fails
+            kittyStr, err := kittyInline(img)
+            if err != nil {
+                fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for display math '%s': %v\n", content, err)
+                return match // Return original match if Kitty protocol generation fails
             }
-            return "" // remove the raw LaTeX only if both rendering and Kitty display are successful
+            return kittyStr // Return the Kitty protocol string to be inserted inline
         })
 
         // 2. Inline-math next
@@ -117,11 +125,12 @@ func main() {
                 fmt.Fprintf(os.Stderr, "Error rendering inline math '%s': %v\n", content, err)
                 return match // Return original match if rendering fails
             }
-            if err := kittyInline(img); err != nil {
-                fmt.Fprintf(os.Stderr, "Error displaying Kitty image for inline math '%s': %v\n", content, err)
-                return match // Return original match if Kitty display fails
+            kittyStr, err := kittyInline(img)
+            if err != nil {
+                fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math '%s': %v\n", content, err)
+                return match // Return original match if Kitty protocol generation fails
             }
-            return "" // remove the raw LaTeX only if both rendering and Kitty display are successful
+            return kittyStr // Return the Kitty protocol string to be inserted inline
         })
 
         // 3. Print any remaining Markdown
