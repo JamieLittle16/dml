@@ -52,6 +52,18 @@ Use a value like \fB150\fR for lower resolution, or \fB600\fR for higher resolut
 \fB-d\fR \fIDPI_VALUE\fR
 Short alias for \fB--dpi\fR. If both are provided, \fB-d\fR takes precedence.
 .TP
+\fB--render-all-latex\fR
+Render the entire input (including Markdown formatting like bold/italic, and plain text)
+as a single LaTeX document. This document is then compiled and displayed as one
+continuous image using the Kitty graphics protocol.
+This mode ensures consistent LaTeX font rendering for all content, but all text
+becomes part of an image and is not selectable as terminal text.
+Basic Markdown (bold, italic) and LaTeX math expressions within the input
+are converted to their LaTeX equivalents.
+.TP
+\fB-l\fR
+Short alias for \fB--render-all-latex\fR.
+.TP
 \fB--help\fR, \fB-h\fR
   (Note: Standard Go flag behavior; prints usage to stderr and exits.)
 .SH EXIT STATUS
@@ -80,7 +92,12 @@ Render inline math at a specific height (e.g., 2 terminal rows):
 .TP
 Render display math with a custom DPI (e.g., 150 DPI):
 .RS
-.B echo 'Display math at 150 DPI: $$ \\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2} $$' | dml --dpi 150
+.B echo \'Display math at 150 DPI: $$ \\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2} $$\' | dml --dpi 150
+.RE
+.TP
+Render an entire document (Markdown and text) as a single LaTeX image:
+.RS
+.B echo \'# Doc Title\\nSome **bold** and *italic* text, with math $E=mc^2$.\nThis will all be one image.\' | dml -l
 .RE
 .SH PREREQUISITES
 .TP

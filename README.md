@@ -79,6 +79,8 @@ some_command | dml [OPTIONS]
 *   `-s SIZE`: Short alias for `--size`. If both are provided, `-s` takes precedence.
 *   `--dpi DPI_VALUE`: Set the DPI (dots per inch) for rendering LaTeX images. `DPI_VALUE` is an integer. Defaults to `300`. Higher values produce sharper images but may be slower.
 *   `-d DPI_VALUE`: Short alias for `--dpi`. If both are provided, `-d` takes precedence.
+*   `--render-all-latex`: Render the entire input (including Markdown and text) as a single LaTeX document, which is then displayed as one image. This allows for consistent LaTeX font rendering throughout, but all text becomes part of an image.
+*   `-l`: Short alias for `--render-all-latex`.
 *   `--help` / `-h`: Displays help information about flags. (Standard Go flag behavior, prints to stderr).
 
 **Examples:**
@@ -112,7 +114,12 @@ some_command | dml [OPTIONS]
     echo 'Display math at 150 DPI: $$ \int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2} $$' | dml --dpi 150
     ```
 
-6.  **Viewing the man page (after installation):**
+6.  **Render entire input as a single LaTeX image:**
+    ```bash
+    echo '# My Document\nThis is **bold text**, *italic text*, and some math $x^2 + y^2 = z^2$.\nAll of this will be one image.' | dml -l
+    ```
+
+7.  **Viewing the man page (after installation):**
     ```bash
     man dml
     ```
