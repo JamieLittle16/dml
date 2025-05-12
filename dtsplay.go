@@ -36,6 +36,14 @@ var latexEscaper = strings.NewReplacer(
 	`}`, `\}`,
 	`~`, `\textasciitilde{}`,
 	`^`, `\textasciicircum{}`,
+	`[`, `{[}`,
+	`]`, `{]}`,
+	`|`, `{\vert}`,
+	`/`, `{/}`,
+	`[`, `{[}`,
+	`]`, `{]}`,
+	`|`, `{|}`,
+	`/`, `{/}`,
 )
 
 func escapeLatex(s string) string {
@@ -82,12 +90,33 @@ func generateLatexFromAST(node ast.Node, sb *strings.Builder) {
 		sb.WriteString("\\\\\n") // LaTeX line break
 	case *ast.Hardbreak: // Explicit line break (e.g., two spaces at end of line)
 		sb.WriteString("\\\\\n") // LaTeX line break
+	case *ast.Code: // Inline code
+		sb.WriteString(`\texttt{`)
+		sb.WriteString(escapeLatex(string(n.Literal)))
+		sb.WriteString(`}`)
+	case *ast.CodeBlock: // Code block
+		sb.WriteString("\n\\begin{verbatim}\n")
+		sb.WriteString(string(n.Literal)) // No need to escape in verbatim
+		sb.WriteString("\\end{verbatim}\n")
+	case *ast.Heading: // Section headings
+		level := n.Level
+		prefix := ""
+		switch level {
+		case 1:
+			prefix = "\\section*{"
+		case 2:
+			prefix = "\\subsection*{"
+		case 3:
+			prefix = "\\subsubsection*{"
+		case 4, 5, 6:
+			prefix = "\\paragraph*{"
+		}
+		sb.WriteString(prefix)
+		processChildren(n)
+		sb.WriteString("}\n")
 	// Default handling for other common nodes: just process their children.
-	// This will extract text, bold, italic, and math from within them.
-	// More specific LaTeX conversions could be added here for lists, headings, etc.
 	case *ast.List, *ast.ListItem, *ast.Link, *ast.Image,
-		*ast.Code, *ast.CodeBlock, *ast.BlockQuote, *ast.Heading,
-		*ast.HorizontalRule, *ast.HTMLBlock, *ast.HTMLSpan,
+		*ast.BlockQuote, *ast.HorizontalRule, *ast.HTMLBlock, *ast.HTMLSpan,
 		*ast.Table, *ast.TableCell, *ast.TableHeader, *ast.TableRow:
 		processChildren(n) // For now, just try to render their content
 	default:
@@ -100,39 +129,25 @@ func generateLatexFromAST(node ast.Node, sb *strings.Builder) {
 }
 
 func renderFullLatexDocument(latexBody string, color string, dpi int) ([]byte, error) {
-	// Setup the color command based on input color type (name or hex)
-	var colorSetup string
-	if strings.HasPrefix(color, "#") {
-		// Handle hex color format (#RRGGBB)
-		hexColor := strings.TrimPrefix(color, "#")
-		colorSetup = fmt.Sprintf(`
-% Define custom color from hex
-\usepackage[dvipsnames,svgnames,table]{xcolor}
-\definecolor{customcolor}{HTML}{%s}
-\pagecolor{white}
-\color{customcolor}`, hexColor)
-	} else {
-		// Handle named color
-		colorSetup = fmt.Sprintf(`
-\usepackage[dvipsnames,svgnames,table]{xcolor}
-\pagecolor{white}
-\color{%s}`, color)
+	// Set default color to white if not specified
+	if color == "" {
+		color = "white"
 	}
-
-	// Template with color setup in preamble
-	texTemplate := `\documentclass[preview,varwidth=\maxdimen]{standalone}
+	texTemplate := `\documentclass[border=0pt,preview]{standalone}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{amsfonts}
-%s
+\usepackage{mathtools}
+\usepackage[dvipsnames,svgnames,table]{xcolor}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
+\usepackage{verbatim}
 \begin{document}
+\color{%s}
 %s
 \end{document}`
-
-	tex := fmt.Sprintf(texTemplate, colorSetup, latexBody)
+	tex := fmt.Sprintf(texTemplate, color, latexBody)
 
 	dir, err := ioutil.TempDir("", "dtsplay-full")
 	if err != nil {
@@ -156,7 +171,8 @@ func renderFullLatexDocument(latexBody string, color string, dpi int) ([]byte, e
 	pngFile := dir + "/fulldoc.png"
 	stdout.Reset()
 	stderr.Reset()
-	cmd = exec.Command("convert", "-density", fmt.Sprintf("%d", dpi), pdfFile, pngFile)
+	// Add -transparent white option to make white background transparent
+	cmd = exec.Command("convert", "-density", fmt.Sprintf("%d", dpi), "-transparent", "white", pdfFile, pngFile)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
@@ -177,32 +193,28 @@ func renderFullLatexDocument(latexBody string, color string, dpi int) ([]byte, e
 }
 
 func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, error) {
-    	var colorCmd string
-    	if strings.HasPrefix(color, "#") {
-    		colorCmd = fmt.Sprintf(`\color[HTML]{%s}`, strings.TrimPrefix(color, "#"))
-    	} else {
-    		colorCmd = fmt.Sprintf(`\color{%s}`, color)
-    	}
+	// Set default color to white if not specified
+	if color == "" {
+		color = "white"
+	}
+	texTemplate := `\documentclass[border=0pt,preview]{standalone}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage[dvipsnames,svgnames,table]{xcolor}
+\begin{document}
+\color{%s}
+%s
+\end{document}`
+	var mathContent string
+	if isDisplay {
+		mathContent = fmt.Sprintf(`\[%s\]`, latex)
+	} else {
+		mathContent = fmt.Sprintf(`$%s$`, latex)
+	}
+	tex := fmt.Sprintf(texTemplate, color, mathContent)
 
-    	var texTemplate string
-    	if isDisplay {
-    		texTemplate = `\documentclass[preview]{standalone}
-	\usepackage{amsmath}
-	\usepackage{xcolor}
-	\begin{document}
-	%s\[%s\]
-	\end{document}`
-    	} else {
-    		texTemplate = `\documentclass[preview]{standalone}
-	\usepackage{amsmath}
-	\usepackage{xcolor}
-	\begin{document}
-	%s$%s$
-	\end{document}`
-    	}
-    	tex := fmt.Sprintf(texTemplate, colorCmd, latex)
-
-    	dir, err := ioutil.TempDir("", "dtsplay")
+	dir, err := ioutil.TempDir("", "dtsplay")
     if err != nil {
         return nil, err
     }
@@ -228,7 +240,7 @@ func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, er
     pngFile := dir + "/eq.png"
     stdout.Reset() // Clear stdout buffer for the convert command
     stderr.Reset() // Clear stderr buffer for the convert command
-    cmd = exec.Command("convert", "-density", fmt.Sprintf("%d", dpi), pdfFile, pngFile)
+    cmd = exec.Command("convert", "-density", fmt.Sprintf("%d", dpi), "-transparent", "white", pdfFile, pngFile)
     cmd.Stdout = &stdout
     cmd.Stderr = &stderr
     if err := cmd.Run(); err != nil {
@@ -361,13 +373,15 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 	dFlag := flag.Int("d", 0, "Short alias for --dpi. Overrides --dpi if set (and not 0).")
 	renderAllLatexFlag := flag.Bool("render-all-latex", false, "Render entire input as a single LaTeX document/image.")
 	lFlag := flag.Bool("l", false, "Short alias for --render-all-latex.")
-	
+
 	flag.Parse() // Parse all flags first
 
-	// Determine the effective color to use
-	effectiveColor := *colourFlag
-	if *cFlag != "" { // If -c is set to a non-empty string, it takes precedence
+	// Set default color to white and apply overrides if specified
+	effectiveColor := "white"
+	if *cFlag != "" {
 		effectiveColor = *cFlag
+	} else if *colourFlag != "white" {
+		effectiveColor = *colourFlag
 	}
 
 	// Determine if short flags -s and -d were explicitly set
@@ -430,16 +444,16 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 		kittyStr, kittyErr := kittyInline(img, true, effectiveSize)
 		if kittyErr != nil {
 			fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for full document: %v\n", kittyErr)
-			fmt.Print(inputString) 
+			fmt.Print(inputString)
 			os.Exit(1)
 		}
-		fmt.Print(kittyStr) 
+		fmt.Print(kittyStr)
 
 	} else {
 		// Original processing mode (per-expression LaTeX, Markdown for bold/italic)
 		line := inputString
 		line = displayMath.ReplaceAllStringFunc(line, func(match string) string {
-			content := match[2 : len(match)-2] 
+			content := match[2 : len(match)-2]
 			img, err := renderMath(content, effectiveColor, true, effectiveDPI)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error rendering display math ('%s'): %v\n", content, err)
@@ -448,22 +462,22 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 			kittyStr, err := kittyInline(img, true, effectiveSize)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for display math ('%s'): %v\n", content, err)
-				return match 
+				return match
 			}
-			return kittyStr 
+			return kittyStr
 		})
 
 		line = displayMathBracket.ReplaceAllStringFunc(line, func(match string) string {
 			content := strings.TrimSpace(match[2 : len(match)-2])
 			if content == "" { return match }
-			img, err := renderMath(content, effectiveColor, true, effectiveDPI) 
+			img, err := renderMath(content, effectiveColor, true, effectiveDPI)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error rendering display math ('%s'): %v\n", content, err) 
+				fmt.Fprintf(os.Stderr, "Error rendering display math ('%s'): %v\n", content, err)
 				return match
 			}
-			kittyStr, err := kittyInline(img, true, effectiveSize) 
+			kittyStr, err := kittyInline(img, true, effectiveSize)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for display math ('%s'): %v\n", content, err) 
+				fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for display math ('%s'): %v\n", content, err)
 				return match
 			}
 			return kittyStr
@@ -477,7 +491,7 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 				fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\n", content, err)
 				return match
 			}
-			kittyStr, err := kittyInline(img, false, effectiveSize) 
+			kittyStr, err := kittyInline(img, false, effectiveSize)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\n", content, err)
 				return match
@@ -490,12 +504,12 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 			if content == "" { return match }
 			img, err := renderMath(content, effectiveColor, false, effectiveDPI)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\n", content, err) 
+				fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\n", content, err)
 				return match
 			}
-			kittyStr, err := kittyInline(img, false, effectiveSize) 
+			kittyStr, err := kittyInline(img, false, effectiveSize)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\n", content, err) 
+				fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\n", content, err)
 				return match
 			}
 			return kittyStr
