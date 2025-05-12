@@ -22,6 +22,43 @@ func isHexColor(s string) bool {
 	return matched
 }
 
+// Map of named colors to hex codes (CSS/X11 names, can expand as needed)
+var namedColorHex = map[string]string{
+	"black":   "#000000",
+	"white":   "#FFFFFF",
+	"red":     "#FF0000",
+	"green":   "#00FF00",
+	"blue":    "#0000FF",
+	"yellow":  "#FFFF00",
+	"cyan":    "#00FFFF",
+	"magenta": "#FF00FF",
+	"gray":    "#808080",
+	"grey":    "#808080",
+	"orange":  "#FFA500",
+	"purple":  "#800080",
+	"brown":   "#A52A2A",
+	"pink":    "#FFC0CB",
+	"lime":    "#00FF00",
+	"navy":    "#000080",
+	"teal":    "#008080",
+	"maroon":  "#800000",
+	"olive":   "#808000",
+	"silver":  "#C0C0C0",
+	// Add more as needed
+}
+
+// Returns a hex code for a color string (hex or named), or empty string if unknown
+func colorToHex(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	if isHexColor(s) {
+		return expandHexColor(s)
+	}
+	if hex, ok := namedColorHex[s]; ok {
+		return hex
+	}
+	return ""
+}
+
 // Expands #RGB to #RRGGBB
 func expandHexColor(s string) string {
 	if len(s) == 4 {
@@ -167,20 +204,18 @@ func renderFullLatexDocument(latexBody string, color string, dpi int) ([]byte, e
 	transparent := "black"
 	latexColorDefs := ""
 
-	if isHexColor(color) {
-		color = expandHexColor(color)
-		comp := complementHexColor(color)
-		bg = comp
-		transparent = comp
-		latexColorDefs = latexColorDef("usercolor", color) + latexColorDef("bgcolor", comp)
+	hexColor := colorToHex(color)
+	if hexColor != "" {
+		comp := complementHexColor(hexColor)
+		latexColorDefs = latexColorDef("usercolor", hexColor) + latexColorDef("bgcolor", comp)
 		color = "usercolor"
 		bg = "bgcolor"
-	} else if color == "white" || color == "#fff" || color == "#ffffff" {
+		transparent = comp
+	} else {
+		// fallback: use white text on black bg
+		color = "white"
 		bg = "black"
 		transparent = "black"
-	} else if color == "black" || color == "#000" || color == "#000000" {
-		bg = "white"
-		transparent = "white"
 	}
 
 	texTemplate := `\documentclass[border=0pt,preview]{standalone}
@@ -251,20 +286,18 @@ func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, er
 	transparent := "black"
 	latexColorDefs := ""
 
-	if isHexColor(color) {
-		color = expandHexColor(color)
-		comp := complementHexColor(color)
-		bg = comp
-		transparent = comp
-		latexColorDefs = latexColorDef("usercolor", color) + latexColorDef("bgcolor", comp)
+	hexColor := colorToHex(color)
+	if hexColor != "" {
+		comp := complementHexColor(hexColor)
+		latexColorDefs = latexColorDef("usercolor", hexColor) + latexColorDef("bgcolor", comp)
 		color = "usercolor"
 		bg = "bgcolor"
-	} else if color == "white" || color == "#fff" || color == "#ffffff" {
+		transparent = comp
+	} else {
+		// fallback: use white text on black bg
+		color = "white"
 		bg = "black"
 		transparent = "black"
-	} else if color == "black" || color == "#000" || color == "#000000" {
-		bg = "white"
-		transparent = "white"
 	}
 
 	texTemplate := `\documentclass[border=0pt,preview]{standalone}
