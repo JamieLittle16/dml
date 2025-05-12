@@ -8,12 +8,43 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/BourgeoisBear/rasterm"
 	"github.com/gomarkdown/markdown/ast"
 	"github.com/gomarkdown/markdown/parser"
 )
+
+// Returns true if s is a hex color (#RRGGBB or #RGB)
+func isHexColor(s string) bool {
+	matched, _ := regexp.MatchString(`^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$`, s)
+	return matched
+}
+
+// Expands #RGB to #RRGGBB
+func expandHexColor(s string) string {
+	if len(s) == 4 {
+		return "#" + strings.Repeat(string(s[1]), 2) +
+			strings.Repeat(string(s[2]), 2) +
+			strings.Repeat(string(s[3]), 2)
+	}
+	return s
+}
+
+// Returns the complement of a #RRGGBB hex color as #RRGGBB
+func complementHexColor(s string) string {
+	s = expandHexColor(s)
+	r, _ := strconv.ParseUint(s[1:3], 16, 8)
+	g, _ := strconv.ParseUint(s[3:5], 16, 8)
+	b, _ := strconv.ParseUint(s[5:7], 16, 8)
+	return fmt.Sprintf("#%02X%02X%02X", 0xFF^r, 0xFF^g, 0xFF^b)
+}
+
+// Returns the color name and LaTeX color definition for a hex color
+func latexColorDef(name, hex string) string {
+	return fmt.Sprintf("\\definecolor{%s}{HTML}{%s}\n", name, hex[1:])
+}
 
 var (
 	// Added (?s) to make '.' match newlines for multi-line LaTeX expressions.
@@ -129,34 +160,46 @@ func generateLatexFromAST(node ast.Node, sb *strings.Builder) {
 }
 
 func renderFullLatexDocument(latexBody string, color string, dpi int) ([]byte, error) {
-	// Set default color to white if not specified
 	if color == "" {
 		color = "white"
 	}
-	bg := "white"
-	transparent := "white"
-	// If white text, render on black and make black transparent
-	if color == "white" || color == "#fff" || color == "#ffffff" {
+	bg := "black"
+	transparent := "black"
+	latexColorDefs := ""
+
+	if isHexColor(color) {
+		color = expandHexColor(color)
+		comp := complementHexColor(color)
+		bg = comp
+		transparent = comp
+		latexColorDefs = latexColorDef("usercolor", color) + latexColorDef("bgcolor", comp)
+		color = "usercolor"
+		bg = "bgcolor"
+	} else if color == "white" || color == "#fff" || color == "#ffffff" {
 		bg = "black"
 		transparent = "black"
+	} else if color == "black" || color == "#000" || color == "#000000" {
+		bg = "white"
+		transparent = "white"
 	}
+
 	texTemplate := `\documentclass[border=0pt,preview]{standalone}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{amsfonts}
 \usepackage{mathtools}
 \usepackage[dvipsnames,svgnames,table]{xcolor}
-
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
 \usepackage{verbatim}
+%s
 \begin{document}
 \pagecolor{%s}
 \color{%s}
 %s
 \end{document}`
-	tex := fmt.Sprintf(texTemplate, bg, color, latexBody)
+	tex := fmt.Sprintf(texTemplate, latexColorDefs, bg, color, latexBody)
 
 	dir, err := ioutil.TempDir("", "dtsplay-full")
 	if err != nil {
@@ -180,7 +223,6 @@ func renderFullLatexDocument(latexBody string, color string, dpi int) ([]byte, e
 	pngFile := dir + "/fulldoc.png"
 	stdout.Reset()
 	stderr.Reset()
-	// Add -transparent color option to make background transparent
 	cmd = exec.Command("convert", "-density", fmt.Sprintf("%d", dpi), "-transparent", transparent, pdfFile, pngFile)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -202,22 +244,35 @@ func renderFullLatexDocument(latexBody string, color string, dpi int) ([]byte, e
 }
 
 func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, error) {
-	// Set default color to white if not specified
 	if color == "" {
 		color = "white"
 	}
-	bg := "white"
-	transparent := "white"
-	if color == "white" || color == "#fff" || color == "#ffffff" {
+	bg := "black"
+	transparent := "black"
+	latexColorDefs := ""
+
+	if isHexColor(color) {
+		color = expandHexColor(color)
+		comp := complementHexColor(color)
+		bg = comp
+		transparent = comp
+		latexColorDefs = latexColorDef("usercolor", color) + latexColorDef("bgcolor", comp)
+		color = "usercolor"
+		bg = "bgcolor"
+	} else if color == "white" || color == "#fff" || color == "#ffffff" {
 		bg = "black"
 		transparent = "black"
+	} else if color == "black" || color == "#000" || color == "#000000" {
+		bg = "white"
+		transparent = "white"
 	}
+
 	texTemplate := `\documentclass[border=0pt,preview]{standalone}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{mathtools}
 \usepackage[dvipsnames,svgnames,table]{xcolor}
-\usepackage{pagecolor}
+%s
 \begin{document}
 \pagecolor{%s}
 \color{%s}
@@ -229,57 +284,57 @@ func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, er
 	} else {
 		mathContent = fmt.Sprintf(`$%s$`, latex)
 	}
-	tex := fmt.Sprintf(texTemplate, bg, color, mathContent)
+	tex := fmt.Sprintf(texTemplate, latexColorDefs, bg, color, mathContent)
 
 	dir, err := ioutil.TempDir("", "dtsplay")
-    if err != nil {
-        return nil, err
-    }
-    texFile := dir + "/eq.tex"
-    if err := ioutil.WriteFile(texFile, []byte(tex), 0644); err != nil {
-        os.RemoveAll(dir) // Clean up if tex file writing fails
-        return nil, err
-    }
+	if err != nil {
+		return nil, err
+	}
+	texFile := dir + "/eq.tex"
+	if err := ioutil.WriteFile(texFile, []byte(tex), 0644); err != nil {
+		os.RemoveAll(dir) // Clean up if tex file writing fails
+		return nil, err
+	}
 
-    // 2. Compile to PDF
-    var stdout, stderr bytes.Buffer
-    cmd := exec.Command("pdflatex", "-interaction=nonstopmode", "-output-directory", dir, texFile)
-    cmd.Stdout = &stdout
-    cmd.Stderr = &stderr
-    if err := cmd.Run(); err != nil {
-        // If pdflatex fails, do not remove the temp directory so logs can be inspected.
-        // The error message now includes the path to the temp directory.
-        return nil, fmt.Errorf("pdflatex failed for '%s': %v\nLaTeX STDOUT:\n%s\nLaTeX STDERR:\n%s\nTemp dir: %s", latex, err, stdout.String(), stderr.String(), dir)
-    }
+	// 2. Compile to PDF
+	var stdout, stderr bytes.Buffer
+	cmd := exec.Command("pdflatex", "-interaction=nonstopmode", "-output-directory", dir, texFile)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		// If pdflatex fails, do not remove the temp directory so logs can be inspected.
+		// The error message now includes the path to the temp directory.
+		return nil, fmt.Errorf("pdflatex failed for '%s': %v\nLaTeX STDOUT:\n%s\nLaTeX STDERR:\n%s\nTemp dir: %s", latex, err, stdout.String(), stderr.String(), dir)
+	}
 
-    // 3. Convert PDF → PNG
-    pdfFile := dir + "/eq.pdf"
-    pngFile := dir + "/eq.png"
-    stdout.Reset() // Clear stdout buffer for the convert command
-    stderr.Reset() // Clear stderr buffer for the convert command
-    cmd = exec.Command("convert", "-density", fmt.Sprintf("%d", dpi), "-transparent", transparent, pdfFile, pngFile)
-    cmd.Stdout = &stdout
-    cmd.Stderr = &stderr
-    if err := cmd.Run(); err != nil {
-        // If convert command itself returns an error, keep temp dir for inspection.
-        return nil, fmt.Errorf("convert command failed for PDF '%s': %v\nConverter STDOUT:\n%s\nConverter STDERR:\n%s\nTemp dir: %s", pdfFile, err, stdout.String(), stderr.String(), dir)
-    }
+	// 3. Convert PDF → PNG
+	pdfFile := dir + "/eq.pdf"
+	pngFile := dir + "/eq.png"
+	stdout.Reset() // Clear stdout buffer for the convert command
+	stderr.Reset() // Clear stderr buffer for the convert command
+	cmd = exec.Command("convert", "-density", fmt.Sprintf("%d", dpi), "-transparent", transparent, pdfFile, pngFile)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		// If convert command itself returns an error, keep temp dir for inspection.
+		return nil, fmt.Errorf("convert command failed for PDF '%s': %v\nConverter STDOUT:\n%s\nConverter STDERR:\n%s\nTemp dir: %s", pdfFile, err, stdout.String(), stderr.String(), dir)
+	}
 
-    // Check if PNG file was actually created by convert, even if it exited 0
-    if _, statErr := os.Stat(pngFile); os.IsNotExist(statErr) {
-        // Convert "succeeded" (exit 0) but didn't create the file. Keep temp dir.
-        return nil, fmt.Errorf("convert command appeared to succeed but did not create PNG '%s'.\nConverter STDOUT:\n%s\nConverter STDERR:\n%s\nTemp dir: %s", pngFile, stdout.String(), stderr.String(), dir)
-    }
+	// Check if PNG file was actually created by convert, even if it exited 0
+	if _, statErr := os.Stat(pngFile); os.IsNotExist(statErr) {
+		// Convert "succeeded" (exit 0) but didn't create the file. Keep temp dir.
+		return nil, fmt.Errorf("convert command appeared to succeed but did not create PNG '%s'.\nConverter STDOUT:\n%s\nConverter STDERR:\n%s\nTemp dir: %s", pngFile, stdout.String(), stderr.String(), dir)
+	}
 
-    // PNG file exists, now try to read it.
-    imgData, readFileErr := ioutil.ReadFile(pngFile)
-    if readFileErr != nil {
-        // If reading fails (e.g., permissions, or file is corrupt), keep temp dir.
-        return nil, fmt.Errorf("failed to read PNG file '%s': %v\nTemp dir: %s", pngFile, readFileErr, dir)
-    }
+	// PNG file exists, now try to read it.
+	imgData, readFileErr := ioutil.ReadFile(pngFile)
+	if readFileErr != nil {
+		// If reading fails (e.g., permissions, or file is corrupt), keep temp dir.
+		return nil, fmt.Errorf("failed to read PNG file '%s': %v\nTemp dir: %s", pngFile, readFileErr, dir)
+	}
 
-    os.RemoveAll(dir) // Clean up ONLY on full success (pdflatex, convert, png exists, png read)
-    return imgData, nil
+	os.RemoveAll(dir) // Clean up ONLY on full success (pdflatex, convert, png exists, png read)
+	return imgData, nil
 }
 
 // kittyInline generates the Kitty graphics protocol string for the given image bytes.
