@@ -533,7 +533,7 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 		// Preprocess \[...\] and \(...\) to $$...$$ and $...$ for correct math parsing
 		preprocessed := displayMathBracket.ReplaceAllStringFunc(inputString, func(match string) string {
 			content := strings.TrimSpace(match[2 : len(match)-2])
-			return "$$" + content + "$$"
+			return "$" + content + "$"
 		})
 		preprocessed = inlineMathParen.ReplaceAllStringFunc(preprocessed, func(match string) string {
 			content := strings.TrimSpace(match[2 : len(match)-2])
