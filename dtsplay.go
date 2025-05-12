@@ -530,10 +530,20 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 
 	if isRenderAllLatexMode {
 		// Full LaTeX rendering mode
+		// Preprocess \[...\] and \(...\) to $$...$$ and $...$ for correct math parsing
+		preprocessed := displayMathBracket.ReplaceAllStringFunc(inputString, func(match string) string {
+			content := strings.TrimSpace(match[2 : len(match)-2])
+			return "$$" + content + "$$"
+		})
+		preprocessed = inlineMathParen.ReplaceAllStringFunc(preprocessed, func(match string) string {
+			content := strings.TrimSpace(match[2 : len(match)-2])
+			return "$" + content + "$"
+		})
+
 		// Enable MathJax and other common extensions for parsing
 		// The parser.MathJax extension is key here as it will create ast.Math and ast.MathBlock nodes.
 		p := parser.NewWithExtensions(parser.CommonExtensions | parser.MathJax)
-		docNode := p.Parse(inputBytes)
+		docNode := p.Parse([]byte(preprocessed))
 
 		var latexBodyBuilder strings.Builder
 		generateLatexFromAST(docNode, &latexBodyBuilder)
