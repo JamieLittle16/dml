@@ -133,21 +133,30 @@ func renderFullLatexDocument(latexBody string, color string, dpi int) ([]byte, e
 	if color == "" {
 		color = "white"
 	}
+	bg := "white"
+	transparent := "white"
+	// If white text, render on black and make black transparent
+	if color == "white" || color == "#fff" || color == "#ffffff" {
+		bg = "black"
+		transparent = "black"
+	}
 	texTemplate := `\documentclass[border=0pt,preview]{standalone}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{amsfonts}
 \usepackage{mathtools}
 \usepackage[dvipsnames,svgnames,table]{xcolor}
+
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
 \usepackage{verbatim}
 \begin{document}
+\pagecolor{%s}
 \color{%s}
 %s
 \end{document}`
-	tex := fmt.Sprintf(texTemplate, color, latexBody)
+	tex := fmt.Sprintf(texTemplate, bg, color, latexBody)
 
 	dir, err := ioutil.TempDir("", "dtsplay-full")
 	if err != nil {
@@ -171,8 +180,8 @@ func renderFullLatexDocument(latexBody string, color string, dpi int) ([]byte, e
 	pngFile := dir + "/fulldoc.png"
 	stdout.Reset()
 	stderr.Reset()
-	// Add -transparent white option to make white background transparent
-	cmd = exec.Command("convert", "-density", fmt.Sprintf("%d", dpi), "-transparent", "white", pdfFile, pngFile)
+	// Add -transparent color option to make background transparent
+	cmd = exec.Command("convert", "-density", fmt.Sprintf("%d", dpi), "-transparent", transparent, pdfFile, pngFile)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
@@ -197,12 +206,20 @@ func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, er
 	if color == "" {
 		color = "white"
 	}
+	bg := "white"
+	transparent := "white"
+	if color == "white" || color == "#fff" || color == "#ffffff" {
+		bg = "black"
+		transparent = "black"
+	}
 	texTemplate := `\documentclass[border=0pt,preview]{standalone}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{mathtools}
 \usepackage[dvipsnames,svgnames,table]{xcolor}
+\usepackage{pagecolor}
 \begin{document}
+\pagecolor{%s}
 \color{%s}
 %s
 \end{document}`
@@ -212,7 +229,7 @@ func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, er
 	} else {
 		mathContent = fmt.Sprintf(`$%s$`, latex)
 	}
-	tex := fmt.Sprintf(texTemplate, color, mathContent)
+	tex := fmt.Sprintf(texTemplate, bg, color, mathContent)
 
 	dir, err := ioutil.TempDir("", "dtsplay")
     if err != nil {
@@ -240,7 +257,7 @@ func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, er
     pngFile := dir + "/eq.png"
     stdout.Reset() // Clear stdout buffer for the convert command
     stderr.Reset() // Clear stderr buffer for the convert command
-    cmd = exec.Command("convert", "-density", fmt.Sprintf("%d", dpi), "-transparent", "white", pdfFile, pngFile)
+    cmd = exec.Command("convert", "-density", fmt.Sprintf("%d", dpi), "-transparent", transparent, pdfFile, pngFile)
     cmd.Stdout = &stdout
     cmd.Stderr = &stderr
     if err := cmd.Run(); err != nil {
