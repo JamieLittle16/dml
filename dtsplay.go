@@ -292,6 +292,11 @@ func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, er
     if latex == "" {
         return nil, fmt.Errorf("empty LaTeX content")
     }
+
+    // Add a small amount of spacing around display math for better rendering
+    if isDisplay {
+        latex = " " + latex + " "
+    }
     // Get debugging flag value from environment - needed for functions outside main
     debugEnv := os.Getenv("DML_DEBUG")
     isDebug := debugEnv == "1" || debugEnv == "true" || debugEnv == "yes"
@@ -379,6 +384,8 @@ func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, er
 	// Convert PDF to PNG with proper transparency handling
 	cmd = exec.Command("convert",
 		"-density", fmt.Sprintf("%d", dpi),
+		"-alpha", "on",
+		"-background", "none",
 		"-trim",             // Remove any excess whitespace
 		"+repage",           // Reset the page after trimming
 		"-transparent", transparent,
@@ -461,13 +468,15 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 		// For display math, ensure there's exactly one trailing newline
 		kittyStr = strings.TrimRight(kittyStr, "\n") + "\n"
 	} else {
-		// For inline math, ensure there are no trailing newlines or special characters
+		// For inline math, ensure there are no trailing newlines
 		kittyStr = strings.TrimRight(kittyStr, "\n")
 	}
 
-	// Remove any unwanted characters that might be present in the Kitty protocol output
-	kittyStr = strings.TrimSuffix(kittyStr, "%")
-	kittyStr = strings.TrimSuffix(kittyStr, "\x00")
+	// Remove null characters that might appear
+	kittyStr = strings.ReplaceAll(kittyStr, "\x00", "")
+
+	// Preserve any needed terminal control sequences
+	// The % at the end might be part of the terminal protocol
 
 	return kittyStr, nil
 }
