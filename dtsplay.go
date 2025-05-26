@@ -220,7 +220,7 @@ func renderFullLatexDocument(latexBody string, color string, dpi int) ([]byte, e
 		transparent = "black"
 	}
 
-	texTemplate := `\documentclass[border=0pt,preview]{standalone}
+	texTemplate := `\documentclass[border=3pt,preview]{standalone}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{amsfonts}
@@ -260,7 +260,13 @@ func renderFullLatexDocument(latexBody string, color string, dpi int) ([]byte, e
 	pngFile := dir + "/fulldoc.png"
 	stdout.Reset()
 	stderr.Reset()
-	cmd = exec.Command("convert", "-density", fmt.Sprintf("%d", dpi), "-transparent", transparent, pdfFile, pngFile)
+	cmd = exec.Command("convert", 
+		"-density", fmt.Sprintf("%d", dpi),
+		"-quality", "100", 
+		"-trim",             // Remove any excess whitespace
+		"+repage",           // Reset the page after trimming
+		"-transparent", transparent,
+		pdfFile, pngFile)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
@@ -281,13 +287,18 @@ func renderFullLatexDocument(latexBody string, color string, dpi int) ([]byte, e
 }
 
 func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, error) {
-	// Get debugging flag value from environment - needed for functions outside main
-	debugEnv := os.Getenv("DML_DEBUG")
-	isDebug := debugEnv == "1" || debugEnv == "true" || debugEnv == "yes"
-	
-	if isDebug {
-		fmt.Fprintf(os.Stderr, "DEBUG: renderMath called with isDisplay=%v, dpi=%d\n", isDisplay, dpi)
-	}
+    // Skip empty latex content
+    latex = strings.TrimSpace(latex)
+    if latex == "" {
+        return nil, fmt.Errorf("empty LaTeX content")
+    }
+    // Get debugging flag value from environment - needed for functions outside main
+    debugEnv := os.Getenv("DML_DEBUG")
+    isDebug := debugEnv == "1" || debugEnv == "true" || debugEnv == "yes"
+
+    if isDebug {
+        fmt.Fprintf(os.Stderr, "DEBUG: renderMath called with isDisplay=%v, dpi=%d\n", isDisplay, dpi)
+    }
 	if color == "" {
 		color = "white"
 	}
@@ -309,9 +320,10 @@ func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, er
 		transparent = "black"
 	}
 
-	texTemplate := `\documentclass[border=0pt,preview]{standalone}
+	texTemplate := `\documentclass[border=4pt,preview]{standalone}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{amsfonts}
 \usepackage{mathtools}
 \usepackage[dvipsnames,svgnames,table]{xcolor}
 %s
@@ -363,7 +375,17 @@ func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, er
 	pngFile := dir + "/eq.png"
 	stdout.Reset() // Clear stdout buffer for the convert command
 	stderr.Reset() // Clear stderr buffer for the convert command
-	cmd = exec.Command("convert", "-density", fmt.Sprintf("%d", dpi), "-transparent", transparent, pdfFile, pngFile)
+
+	// Enhanced convert command with better options for rendering quality
+	cmd = exec.Command("convert", 
+		"-density", fmt.Sprintf("%d", dpi),
+		"-quality", "100",
+		"-trim",             // Remove any excess whitespace
+		"+repage",           // Reset the page after trimming
+		"-bordercolor", transparent,
+		"-border", "1x1",    // Add a tiny border for better spacing
+		"-transparent", transparent,
+		pdfFile, pngFile)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
@@ -404,6 +426,10 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
         // TransferMode and UseWindowSize are not available in this version.
     }
 
+    // Get debug flag value from environment
+    debugEnv := os.Getenv("DML_DEBUG")
+    isDebug := debugEnv == "1" || debugEnv == "true" || debugEnv == "yes"
+
     actualDstRows := 0
     if userTargetRows > 0 {
         actualDstRows = userTargetRows
@@ -421,18 +447,24 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
         opts.DstRows = uint32(actualDstRows)
     }
 
-    	// rasterm.KittyCopyPNGInline expects an io.Reader for the image data.
-    	// We capture its output (the Kitty protocol string) into a strings.Builder.
-    	err := rasterm.KittyCopyPNGInline(&sb, bytes.NewReader(img), opts)
-    	if err != nil {
-    		return "", fmt.Errorf("rasterm.KittyCopyPNGInline failed: %v", err)
-    	}
-    	kittyStr := sb.String()
-    if isDisplayMath {
-        kittyStr += "\n" // Add a newline after display math images
-    }
-    	return kittyStr, nil
-    }
+	// rasterm.KittyCopyPNGInline expects an io.Reader for the image data.
+	// We capture its output (the Kitty protocol string) into a strings.Builder.
+	err := rasterm.KittyCopyPNGInline(&sb, bytes.NewReader(img), opts)
+	if err != nil {
+		return "", fmt.Errorf("rasterm.KittyCopyPNGInline failed: %v", err)
+	}
+	kittyStr := sb.String()
+
+	if isDebug {
+		fmt.Fprintf(os.Stderr, "DEBUG: Generated Kitty protocol with options: rows=%d, isDisplay=%v\n",
+			actualDstRows, isDisplayMath)
+	}
+
+	if isDisplayMath {
+		kittyStr += "\n" // Add a newline after display math images
+	}
+	return kittyStr, nil
+}
 
     // renderMarkdownAST recursively traverses the AST and builds a string with ANSI codes.
     func renderMarkdownAST(node ast.Node, sb *strings.Builder) {
@@ -546,7 +578,7 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 
 	isRenderAllLatexMode := *renderAllLatexFlag || *lFlag
 	isDebugMode := *debugFlag || *dDebugFlag
-	
+
 	if isDebugMode {
 		fmt.Fprintln(os.Stderr, "DEBUG: dml starting")
 		fmt.Fprintln(os.Stderr, "DEBUG: Flags parsed.")
@@ -555,7 +587,9 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 
 	if isRenderAllLatexMode {
 		if isDebugMode {
-			fmt.Fprintln(os.Stderr, "DEBUG: Reading standard input (full document) for render-all-latex mode...")
+			if isDebugMode {
+				fmt.Fprintln(os.Stderr, "DEBUG: Reading standard input (full document) for render-all-latex mode...")
+			}
 		}
 		// Read all of stdin into a single string for full LaTeX mode
 		inputBytes, err := ioutil.ReadAll(os.Stdin)
@@ -565,7 +599,9 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 		}
 		inputString := string(inputBytes)
 		if isDebugMode {
-			fmt.Fprintf(os.Stderr, "DEBUG: Finished reading input (%d bytes).\n", len(inputBytes))
+			if isDebugMode {
+				fmt.Fprintf(os.Stderr, "DEBUG: Finished reading input (%d bytes).\n", len(inputBytes))
+			}
 		}
 
 		// Full LaTeX rendering mode
@@ -607,7 +643,9 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 
 	} else {
 		if isDebugMode {
-			fmt.Fprintln(os.Stderr, "DEBUG: Entering standard processing mode (line-by-line streaming with state).")
+			if isDebugMode {
+				fmt.Fprintln(os.Stderr, "DEBUG: Entering standard processing mode (line-by-line streaming with state).")
+			}
 		}
 		// Streaming processing mode with state for multi-line math
 		// Reads input line by line and processes incrementally.
@@ -619,7 +657,9 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 		var mathBuffer strings.Builder // Buffer for collecting multi-line math content
 		inDisplayMath := false         // State flag
 
+		// Set environment variable for renderMath debug flag if we're in debug mode
 		if isDebugMode {
+			os.Setenv("DML_DEBUG", "1")
 			fmt.Fprintln(os.Stderr, "DEBUG: Starting line-by-line input reading and processing loop...")
 		}
 
@@ -628,7 +668,10 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 		// They are different from the global regexes which assume the whole input is available.
 		startDisplayMathRegex := regexp.MustCompile(`\$\$|\\\[`)
 		endDisplayMathRegex := regexp.MustCompile(`\$\$|\\\]`)
+
+		// Set environment variable for renderMath debug flag if we're in debug mode
 		if isDebugMode {
+		    os.Setenv("DML_DEBUG", "1")
 			fmt.Fprintln(os.Stderr, "DEBUG: Using regexes for display math detection")
 		}
 		// Note: This simplified approach won't handle inline math inside display math,
@@ -650,7 +693,7 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 			if inDisplayMath {
 				// We are inside a display math block
 				if isDebugMode {
-					fmt.Fprintf(os.Stderr, "DEBUG: In display math, processing line: %s\n", strings.TrimSpace(inputLine))
+					fmt.Fprintf(os.Stderr, "DEBUG: In normal mode, processing line: %s\n", strings.TrimSpace(inputLine))
 				}
 
 				endMatchIdx := endDisplayMathRegex.FindStringIndex(inputLine)
@@ -672,6 +715,9 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 					}
 					img, renderErr := renderMath(mathContent, effectiveColor, true, effectiveDPI)
 					if renderErr != nil {
+						if isDebugMode {
+							fmt.Fprintf(os.Stderr, "DEBUG: Attempting to render display math (length: %d chars)\n", len(mathContent))
+						}
 						fmt.Fprintf(os.Stderr, "ERROR: Rendering display math failed: %v\n", renderErr)
 						// On error, print the un-rendered content as text
 						writer.WriteString("$$")
@@ -860,7 +906,7 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 					}
 					img, renderErr := renderMath(mathContent, effectiveColor, true, effectiveDPI)
 					if renderErr != nil {
-						fmt.Fprintf(os.Stderr, "Error rendering display math ('%s'): %v\\n", mathContent, renderErr)
+						fmt.Fprintf(os.Stderr, "ERROR: Rendering display math failed: %v\n", renderErr)
 						// On error, print the un-rendered content as text
 						writer.WriteString("$$")
 						writer.WriteString(mathContent)
@@ -868,7 +914,7 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 					} else {
 						kittyStr, kittyErr := kittyInline(img, true, effectiveSize)
 						if kittyErr != nil {
-							fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for display math ('%s'): %v\\n", mathContent, kittyErr)
+							fmt.Fprintf(os.Stderr, "ERROR: Generating Kitty protocol failed: %v\n", kittyErr)
 							// On error, print the un-rendered content as text
 							writer.WriteString("$$")
 							writer.WriteString(mathContent)
@@ -988,11 +1034,10 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 		if isDebugMode {
 			fmt.Fprintln(os.Stderr, "DEBUG: Output streaming finished.")
 		}
-	}
+		}
 	
-	// Set environment variable for renderMath debug flag if we're in debug mode
+	// Final debug messages if debug mode is enabled
 	if isDebugMode {
-		os.Setenv("DML_DEBUG", "1")
 		fmt.Fprintf(os.Stderr, "DEBUG: dml execution completed. If math rendering issues occurred, check for LaTeX or convert errors.")
 		fmt.Fprintln(os.Stderr, "DEBUG: dml exiting.")
 	}
