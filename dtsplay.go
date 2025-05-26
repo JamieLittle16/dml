@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio" // Added for buffered input/output streaming
 	"bytes"
 	"flag"
 	"fmt"
+	"io" // Added for EOF handling
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -279,6 +281,13 @@ func renderFullLatexDocument(latexBody string, color string, dpi int) ([]byte, e
 }
 
 func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, error) {
+	// Get debugging flag value from environment - needed for functions outside main
+	debugEnv := os.Getenv("DML_DEBUG")
+	isDebug := debugEnv == "1" || debugEnv == "true" || debugEnv == "yes"
+	
+	if isDebug {
+		fmt.Fprintf(os.Stderr, "DEBUG: renderMath called with isDisplay=%v, dpi=%d\n", isDisplay, dpi)
+	}
 	if color == "" {
 		color = "white"
 	}
@@ -314,8 +323,14 @@ func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, er
 	var mathContent string
 	if isDisplay {
 		mathContent = fmt.Sprintf(`\[%s\]`, latex)
+		if isDebug {
+			fmt.Fprintf(os.Stderr, "DEBUG: Creating display math content with \\[ ... \\]\n")
+		}
 	} else {
 		mathContent = fmt.Sprintf(`$%s$`, latex)
+		if isDebug {
+			fmt.Fprintf(os.Stderr, "DEBUG: Creating inline math content with $ ... $\n")
+		}
 	}
 	tex := fmt.Sprintf(texTemplate, latexColorDefs, bg, color, mathContent)
 
@@ -324,6 +339,9 @@ func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, er
 		return nil, err
 	}
 	texFile := dir + "/eq.tex"
+	if isDebug {
+		fmt.Fprintf(os.Stderr, "DEBUG: Created temp directory for LaTeX rendering: %s\n", dir)
+	}
 	if err := ioutil.WriteFile(texFile, []byte(tex), 0644); err != nil {
 		os.RemoveAll(dir) // Clean up if tex file writing fails
 		return nil, err
@@ -356,7 +374,13 @@ func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, er
 	// Check if PNG file was actually created by convert, even if it exited 0
 	if _, statErr := os.Stat(pngFile); os.IsNotExist(statErr) {
 		// Convert "succeeded" (exit 0) but didn't create the file. Keep temp dir.
-		return nil, fmt.Errorf("convert command appeared to succeed but did not create PNG '%s'.\nConverter STDOUT:\n%s\nConverter STDERR:\n%s\nTemp dir: %s", pngFile, stdout.String(), stderr.String(), dir)
+		if isDebug {
+			fmt.Fprintf(os.Stderr, "DEBUG: PNG file not found after conversion: %s\n", pngFile)
+		}
+		return nil, fmt.Errorf("convert command appeared to succeed but did not create PNG '%s'.\nConverter STDOUT:\n%s\nConverter STDERR:\n%s\nTemp dir: %s\nStat error: %v", pngFile, stdout.String(), stderr.String(), dir, statErr)
+	}
+	if isDebug {
+		fmt.Fprintf(os.Stderr, "DEBUG: PNG file successfully created: %s\n", pngFile)
 	}
 
 	// PNG file exists, now try to read it.
@@ -397,13 +421,13 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
         opts.DstRows = uint32(actualDstRows)
     }
 
-    // rasterm.KittyCopyPNGInline expects an io.Reader for the image data.
-    // We capture its output (the Kitty protocol string) into a strings.Builder.
-    err := rasterm.KittyCopyPNGInline(&sb, bytes.NewReader(img), opts)
-    if err != nil {
-        return "", err
-    }
-    kittyStr := sb.String()
+    	// rasterm.KittyCopyPNGInline expects an io.Reader for the image data.
+    	// We capture its output (the Kitty protocol string) into a strings.Builder.
+    	err := rasterm.KittyCopyPNGInline(&sb, bytes.NewReader(img), opts)
+    	if err != nil {
+    		return "", fmt.Errorf("rasterm.KittyCopyPNGInline failed: %v", err)
+    	}
+    	kittyStr := sb.String()
     if isDisplayMath {
         kittyStr += "\n" // Add a newline after display math images
     }
@@ -478,6 +502,8 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 	dFlag := flag.Int("d", 0, "Short alias for --dpi. Overrides --dpi if set (and not 0).")
 	renderAllLatexFlag := flag.Bool("render-all-latex", false, "Render entire input as a single LaTeX document/image.")
 	lFlag := flag.Bool("l", false, "Short alias for --render-all-latex.")
+	debugFlag := flag.Bool("debug", false, "Enable verbose debug output.")
+	dDebugFlag := flag.Bool("D", false, "Short alias for --debug.")
 
 	flag.Parse() // Parse all flags first
 
@@ -519,16 +545,29 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 	}
 
 	isRenderAllLatexMode := *renderAllLatexFlag || *lFlag
-
-	// Read all of stdin into a single string
-	inputBytes, err := ioutil.ReadAll(os.Stdin)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading standard input: %v\n", err)
-		os.Exit(1)
+	isDebugMode := *debugFlag || *dDebugFlag
+	
+	if isDebugMode {
+		fmt.Fprintln(os.Stderr, "DEBUG: dml starting")
+		fmt.Fprintln(os.Stderr, "DEBUG: Flags parsed.")
+		fmt.Fprintf(os.Stderr, "DEBUG: isRenderAllLatexMode: %v\n", isRenderAllLatexMode)
 	}
-	inputString := string(inputBytes)
 
 	if isRenderAllLatexMode {
+		if isDebugMode {
+			fmt.Fprintln(os.Stderr, "DEBUG: Reading standard input (full document) for render-all-latex mode...")
+		}
+		// Read all of stdin into a single string for full LaTeX mode
+		inputBytes, err := ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading standard input: %v\\n", err)
+			os.Exit(1)
+		}
+		inputString := string(inputBytes)
+		if isDebugMode {
+			fmt.Fprintf(os.Stderr, "DEBUG: Finished reading input (%d bytes).\n", len(inputBytes))
+		}
+
 		// Full LaTeX rendering mode
 		// Preprocess \[...\] and \(...\) to $$...$$ and $...$ for correct math parsing
 		preprocessed := displayMathBracket.ReplaceAllStringFunc(inputString, func(match string) string {
@@ -551,86 +590,410 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 
 		img, renderErr := renderFullLatexDocument(latexBody, effectiveColor, effectiveDPI)
 		if renderErr != nil {
-			fmt.Fprintf(os.Stderr, "Error in full LaTeX rendering mode: %v\n", renderErr)
+			fmt.Fprintf(os.Stderr, "Error in full LaTeX rendering mode: %v\\n", renderErr)
+			// In full render mode, if LaTeX fails, print the original input so user can debug
 			fmt.Print(inputString)
 			os.Exit(1)
 		}
 
 		kittyStr, kittyErr := kittyInline(img, true, effectiveSize)
 		if kittyErr != nil {
-			fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for full document: %v\n", kittyErr)
+			fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for full document: %v\\n", kittyErr)
+			// If Kitty protocol generation fails, print original input
 			fmt.Print(inputString)
 			os.Exit(1)
 		}
 		fmt.Print(kittyStr)
 
 	} else {
-		// Original processing mode (per-expression LaTeX, Markdown for bold/italic)
-		line := inputString
-		line = displayMath.ReplaceAllStringFunc(line, func(match string) string {
-			content := match[2 : len(match)-2]
-			img, err := renderMath(content, effectiveColor, true, effectiveDPI)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error rendering display math ('%s'): %v\n", content, err)
-				return match
-			}
-			kittyStr, err := kittyInline(img, true, effectiveSize)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for display math ('%s'): %v\n", content, err)
-				return match
-			}
-			return kittyStr
-		})
+		if isDebugMode {
+			fmt.Fprintln(os.Stderr, "DEBUG: Entering standard processing mode (line-by-line streaming with state).")
+		}
+		// Streaming processing mode with state for multi-line math
+		// Reads input line by line and processes incrementally.
+		// Uses a state machine to buffer multi-line display math blocks.
 
-		line = displayMathBracket.ReplaceAllStringFunc(line, func(match string) string {
-			content := strings.TrimSpace(match[2 : len(match)-2])
-			if content == "" { return match }
-			img, err := renderMath(content, effectiveColor, true, effectiveDPI)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error rendering display math ('%s'): %v\n", content, err)
-				return match
-			}
-			kittyStr, err := kittyInline(img, true, effectiveSize)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for display math ('%s'): %v\n", content, err)
-				return match
-			}
-			return kittyStr
-		})
+		reader := bufio.NewReader(os.Stdin)
+		writer := bufio.NewWriter(os.Stdout) // Use a buffered writer for output flushing
 
-		line = inlineMath.ReplaceAllStringFunc(line, func(match string) string {
-			content := strings.TrimSpace(match[1 : len(match)-1])
-			if content == "" { return match }
-			img, err := renderMath(content, effectiveColor, false, effectiveDPI)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\n", content, err)
-				return match
-			}
-			kittyStr, err := kittyInline(img, false, effectiveSize)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\n", content, err)
-				return match
-			}
-			return kittyStr
-		})
+		var mathBuffer strings.Builder // Buffer for collecting multi-line math content
+		inDisplayMath := false         // State flag
 
-		line = inlineMathParen.ReplaceAllStringFunc(line, func(match string) string {
-			content := strings.TrimSpace(match[2 : len(match)-2])
-			if content == "" { return match }
-			img, err := renderMath(content, effectiveColor, false, effectiveDPI)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\n", content, err)
-				return match
-			}
-			kittyStr, err := kittyInline(img, false, effectiveSize)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\n", content, err)
-				return match
-			}
-			return kittyStr
-		})
+		if isDebugMode {
+			fmt.Fprintln(os.Stderr, "DEBUG: Starting line-by-line input reading and processing loop...")
+		}
 
-		line = applyMarkdownFormatting(line)
-		fmt.Println(line)
+		// Regexes to find delimiters specifically for streaming processing.
+		// These look for the *start* and *end* of delimiters on the current line.
+		// They are different from the global regexes which assume the whole input is available.
+		startDisplayMathRegex := regexp.MustCompile(`\$\$|\\\[`)
+		endDisplayMathRegex := regexp.MustCompile(`\$\$|\\\]`)
+		if isDebugMode {
+			fmt.Fprintln(os.Stderr, "DEBUG: Using regexes for display math detection")
+		}
+		// Note: This simplified approach won't handle inline math inside display math,
+		// or multiple display math blocks on one line perfectly if delimiters are mixed.
+		// It prioritizes streaming output for simple cases.
+
+		for {
+			inputLine, err := reader.ReadString('\n')
+
+			if err != nil && err != io.EOF {
+				fmt.Fprintf(os.Stderr, "Error reading input line: %v\\n", err)
+				writer.Flush() // Flush any pending output
+				os.Exit(1)
+			}
+
+			// Determine if this is the last line
+			isLastLine := (err == io.EOF)
+
+			if inDisplayMath {
+				// We are inside a display math block
+				if isDebugMode {
+					fmt.Fprintf(os.Stderr, "DEBUG: In display math, processing line: %s\n", strings.TrimSpace(inputLine))
+				}
+
+				endMatchIdx := endDisplayMathRegex.FindStringIndex(inputLine)
+
+				if endMatchIdx != nil {
+					// Found the closing delimiter on this line
+					if isDebugMode {
+						fmt.Fprintln(os.Stderr, "DEBUG: Found display math end delimiter.")
+					}
+					mathBuffer.WriteString(inputLine[:endMatchIdx[0]]) // Add content before the delimiter
+
+					mathContent := mathBuffer.String()
+					mathBuffer.Reset() // Clear the buffer
+					inDisplayMath = false // Exit display math state
+
+					// Render the collected math content
+					if isDebugMode {
+						fmt.Fprintf(os.Stderr, "DEBUG: Attempting to render display math (length: %d chars)\n", len(mathContent))
+					}
+					img, renderErr := renderMath(mathContent, effectiveColor, true, effectiveDPI)
+					if renderErr != nil {
+						fmt.Fprintf(os.Stderr, "ERROR: Rendering display math failed: %v\n", renderErr)
+						// On error, print the un-rendered content as text
+						writer.WriteString("$$")
+						writer.WriteString(mathContent)
+						writer.WriteString("$$\n") // Add newline if it's missing from content
+					} else {
+						if isDebugMode {
+							fmt.Fprintln(os.Stderr, "DEBUG: Math rendering successful, generating Kitty protocol")
+						}
+						kittyStr, kittyErr := kittyInline(img, true, effectiveSize)
+						if kittyErr != nil {
+							fmt.Fprintf(os.Stderr, "ERROR: Generating Kitty protocol failed: %v\n", kittyErr)
+							// On error, print the un-rendered content as text
+							writer.WriteString("$$")
+							writer.WriteString(mathContent)
+							writer.WriteString("$$\n") // Add newline if it's missing from content
+						} else {
+							if isDebugMode {
+								fmt.Fprintln(os.Stderr, "DEBUG: Successfully generated Kitty protocol for display math")
+							}
+							writer.WriteString(kittyStr) // Write the rendered image protocol
+						}
+					}
+
+					// Process the rest of the line after the closing delimiter
+					remainingLine := inputLine[endMatchIdx[1]:]
+					if len(remainingLine) > 0 {
+						// Process remaining part of the line as normal text (inline math, markdown)
+						if isDebugMode {
+							fmt.Fprintf(os.Stderr, "DEBUG: Processing remaining line after display math: %s\n", strings.TrimSpace(remainingLine))
+						}
+						processedRemaining := inlineMath.ReplaceAllStringFunc(remainingLine, func(match string) string {
+							content := strings.TrimSpace(match[1 : len(match)-1])
+							if content == "" { return match }
+							img, rErr := renderMath(content, effectiveColor, false, effectiveDPI)
+							if rErr != nil {
+								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\\n", content, rErr)
+								return match
+							}
+							kStr, kErr := kittyInline(img, false, effectiveSize)
+							if kErr != nil {
+								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\\n", content, kErr)
+								return match
+							}
+							return kStr
+						})
+						processedRemaining = inlineMathParen.ReplaceAllStringFunc(processedRemaining, func(match string) string {
+							content := strings.TrimSpace(match[2 : len(match)-2])
+							if content == "" { return match }
+							img, rErr := renderMath(content, effectiveColor, false, effectiveDPI)
+							if rErr != nil {
+								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\\n", content, rErr)
+								return match
+							}
+							kStr, kErr := kittyInline(img, false, effectiveSize)
+							if kErr != nil {
+								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\\n", content, kErr)
+								return match
+							}
+							return kStr
+						})
+						finalRemainingOutput := applyMarkdownFormatting(processedRemaining)
+						writer.WriteString(finalRemainingOutput)
+					}
+
+				} else {
+					// No closing delimiter yet, just buffer the line
+					mathBuffer.WriteString(inputLine)
+					if isDebugMode {
+						fmt.Fprintln(os.Stderr, "DEBUG: Appended line to math buffer.")
+					}
+				}
+
+			} else {
+				// We are in normal text mode
+				if isDebugMode {
+					fmt.Fprintf(os.Stderr, "DEBUG: In normal mode, processing line: %s\n", strings.TrimSpace(inputLine))
+				}
+
+				startMatchIdx := startDisplayMathRegex.FindStringIndex(inputLine)
+				endMatchIdx := endDisplayMathRegex.FindStringIndex(inputLine) // Check for same-line closing
+
+				if startMatchIdx != nil && (endMatchIdx == nil || endMatchIdx[0] < startMatchIdx[0]) {
+					// Found starting delimiter for a multi-line block (and no closing before it)
+					if isDebugMode {
+						fmt.Fprintln(os.Stderr, "DEBUG: Found display math start delimiter. Switching to math state.")
+					}
+					// Process content *before* the delimiter as normal text
+					beforeDelimiter := inputLine[:startMatchIdx[0]]
+					if len(beforeDelimiter) > 0 {
+						if isDebugMode {
+							fmt.Fprintf(os.Stderr, "DEBUG: Processing text before delimiter: %s\n", strings.TrimSpace(beforeDelimiter))
+						}
+						processedBefore := inlineMath.ReplaceAllStringFunc(beforeDelimiter, func(match string) string {
+							content := strings.TrimSpace(match[1 : len(match)-1])
+							if content == "" { return match }
+							img, rErr := renderMath(content, effectiveColor, false, effectiveDPI)
+							if rErr != nil {
+								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\\n", content, rErr)
+								return match
+							}
+							kStr, kErr := kittyInline(img, false, effectiveSize)
+							if kErr != nil {
+								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\\n", content, kErr)
+								return match
+							}
+							return kStr
+						})
+						processedBefore = inlineMathParen.ReplaceAllStringFunc(processedBefore, func(match string) string {
+							content := strings.TrimSpace(match[2 : len(match)-2])
+							if content == "" { return match }
+							img, rErr := renderMath(content, effectiveColor, false, effectiveDPI)
+							if rErr != nil {
+								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\\n", content, rErr)
+								return match
+							}
+							kStr, kErr := kittyInline(img, false, effectiveSize)
+							if kErr != nil {
+								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\\n", content, kErr)
+								return match
+							}
+							return kStr
+						})
+
+						finalBeforeOutput := applyMarkdownFormatting(processedBefore)
+						writer.WriteString(finalBeforeOutput)
+					}
+
+					// Start buffering from the content *after* the delimiter on this line
+					mathBuffer.WriteString(inputLine[startMatchIdx[1]:])
+					inDisplayMath = true // Enter display math state
+					if isDebugMode {
+						fmt.Fprintln(os.Stderr, "DEBUG: Started buffering math content.")
+					}
+
+				} else if startMatchIdx != nil && endMatchIdx != nil && startMatchIdx[0] < endMatchIdx[0] {
+					// Found both start and end delimiters on the same line (single-line display math)
+					if isDebugMode {
+						fmt.Fprintln(os.Stderr, "DEBUG: Found single-line display math.")
+					}
+					// Process content *before* the start delimiter
+					beforeDelimiter := inputLine[:startMatchIdx[0]]
+					if len(beforeDelimiter) > 0 {
+						if isDebugMode {
+							fmt.Fprintf(os.Stderr, "DEBUG: Processing text before single-line math: %s\n", strings.TrimSpace(beforeDelimiter))
+						}
+						processedBefore := inlineMath.ReplaceAllStringFunc(beforeDelimiter, func(match string) string {
+							content := strings.TrimSpace(match[1 : len(match)-1])
+							if content == "" { return match }
+							img, rErr := renderMath(content, effectiveColor, false, effectiveDPI)
+							if rErr != nil {
+								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\\n", content, rErr)
+								return match
+							}
+							kStr, kErr := kittyInline(img, false, effectiveSize)
+							if kErr != nil {
+								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\\n", content, kErr)
+								return match
+							}
+							return kStr
+						})
+						processedBefore = inlineMathParen.ReplaceAllStringFunc(processedBefore, func(match string) string {
+							content := strings.TrimSpace(match[2 : len(match)-2])
+							if content == "" { return match }
+							img, rErr := renderMath(content, effectiveColor, false, effectiveDPI)
+							if rErr != nil {
+								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\\n", content, rErr)
+								return match
+							}
+							kStr, kErr := kittyInline(img, false, effectiveSize)
+							if kErr != nil {
+								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\\n", content, kErr)
+								return match
+							}
+							return kStr
+						})
+
+						finalBeforeOutput := applyMarkdownFormatting(processedBefore)
+						writer.WriteString(finalBeforeOutput)
+					}
+
+					// Extract and process the math content
+					mathContent := inputLine[startMatchIdx[1]:endMatchIdx[0]]
+					if isDebugMode {
+						fmt.Fprintf(os.Stderr, "DEBUG: Rendering single-line display math: %s\n", strings.TrimSpace(mathContent))
+					}
+					img, renderErr := renderMath(mathContent, effectiveColor, true, effectiveDPI)
+					if renderErr != nil {
+						fmt.Fprintf(os.Stderr, "Error rendering display math ('%s'): %v\\n", mathContent, renderErr)
+						// On error, print the un-rendered content as text
+						writer.WriteString("$$")
+						writer.WriteString(mathContent)
+						writer.WriteString("$$\n") // Add newline if it's missing from content
+					} else {
+						kittyStr, kittyErr := kittyInline(img, true, effectiveSize)
+						if kittyErr != nil {
+							fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for display math ('%s'): %v\\n", mathContent, kittyErr)
+							// On error, print the un-rendered content as text
+							writer.WriteString("$$")
+							writer.WriteString(mathContent)
+							writer.WriteString("$$\n") // Add newline if it's missing from content
+						} else {
+							writer.WriteString(kittyStr) // Write the rendered image protocol
+						}
+					}
+
+					// Process content *after* the end delimiter
+					afterDelimiter := inputLine[endMatchIdx[1]:]
+					if len(afterDelimiter) > 0 {
+						if isDebugMode {
+							fmt.Fprintf(os.Stderr, "DEBUG: Processing text after single-line math: %s\n", strings.TrimSpace(afterDelimiter))
+						}
+						processedAfter := inlineMath.ReplaceAllStringFunc(afterDelimiter, func(match string) string {
+							content := strings.TrimSpace(match[1 : len(match)-1])
+							if content == "" { return match }
+							img, rErr := renderMath(content, effectiveColor, false, effectiveDPI)
+							if rErr != nil {
+								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\\n", content, rErr)
+								return match
+							}
+							kStr, kErr := kittyInline(img, false, effectiveSize)
+							if kErr != nil {
+								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\\n", content, kErr)
+								return match
+							}
+							return kStr
+						})
+						processedAfter = inlineMathParen.ReplaceAllStringFunc(processedAfter, func(match string) string {
+							content := strings.TrimSpace(match[2 : len(match)-2])
+							if content == "" { return match }
+							img, rErr := renderMath(content, effectiveColor, false, effectiveDPI)
+							if rErr != nil {
+								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\\n", content, rErr)
+								return match
+							}
+							kStr, kErr := kittyInline(img, false, effectiveSize)
+							if kErr != nil {
+								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\\n", content, kErr)
+								return match
+							}
+							return kStr
+						})
+
+						finalAfterOutput := applyMarkdownFormatting(processedAfter)
+						writer.WriteString(finalAfterOutput)
+					}
+
+				} else {
+					// No display math delimiters found on this line.
+					// Process for inline math and markdown as before.
+					processedLine := inlineMath.ReplaceAllStringFunc(inputLine, func(match string) string {
+						content := strings.TrimSpace(match[1 : len(match)-1])
+						if content == "" { return match }
+						img, rErr := renderMath(content, effectiveColor, false, effectiveDPI)
+						if rErr != nil {
+							fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\\n", content, rErr)
+							return match
+						}
+						kStr, kErr := kittyInline(img, false, effectiveSize)
+						if kErr != nil {
+							fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\\n", content, kErr)
+							return match
+						}
+						return kStr
+					})
+					processedLine = inlineMathParen.ReplaceAllStringFunc(processedLine, func(match string) string {
+						content := strings.TrimSpace(match[2 : len(match)-2])
+						if content == "" { return match }
+						img, rErr := renderMath(content, effectiveColor, false, effectiveDPI)
+						if rErr != nil {
+							fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\\n", content, rErr)
+							return match
+						}
+						kStr, kErr := kittyInline(img, false, effectiveSize)
+						if kErr != nil {
+							fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\\n", content, kErr)
+							return match
+						}
+						return kStr
+					})
+
+					// Apply Markdown formatting to the processed line.
+					finalLineOutput := applyMarkdownFormatting(processedLine)
+
+					// Write the processed line to the buffered writer.
+					writer.WriteString(finalLineOutput)
+				}
+			}
+
+			// Flush the writer immediately after processing a line (or block end).
+			writer.Flush()
+
+			// If the error was EOF, it means we just processed the last line.
+			// The loop condition should break after this iteration.
+			if isLastLine {
+				if isDebugMode {
+					fmt.Fprintln(os.Stderr, "DEBUG: Finished processing line before EOF. Exiting loop after flush.")
+				}
+				break
+			}
+		}
+
+		// Handle case where input ended while still inside a display math block
+		if inDisplayMath {
+			if isDebugMode {
+				fmt.Fprintln(os.Stderr, "DEBUG: Warning: Reached EOF while still inside a display math block. Outputting buffered content as plain text.")
+			}
+			writer.WriteString("$$") // Output the start delimiter that wasn't closed
+			writer.WriteString(mathBuffer.String()) // Output the buffered content
+			// No closing delimiter to output
+			writer.Flush()
+		}
+
+		if isDebugMode {
+			fmt.Fprintln(os.Stderr, "DEBUG: Output streaming finished.")
+		}
+	}
+	
+	// Set environment variable for renderMath debug flag if we're in debug mode
+	if isDebugMode {
+		os.Setenv("DML_DEBUG", "1")
+		fmt.Fprintf(os.Stderr, "DEBUG: dml execution completed. If math rendering issues occurred, check for LaTeX or convert errors.")
+		fmt.Fprintln(os.Stderr, "DEBUG: dml exiting.")
 	}
 }
