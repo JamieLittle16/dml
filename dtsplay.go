@@ -260,9 +260,9 @@ func renderFullLatexDocument(latexBody string, color string, dpi int) ([]byte, e
 	pngFile := dir + "/fulldoc.png"
 	stdout.Reset()
 	stderr.Reset()
-	cmd = exec.Command("convert", 
+	cmd = exec.Command("convert",
 		"-density", fmt.Sprintf("%d", dpi),
-		"-quality", "100", 
+		"-quality", "100",
 		"-trim",             // Remove any excess whitespace
 		"+repage",           // Reset the page after trimming
 		"-transparent", transparent,
@@ -320,7 +320,7 @@ func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, er
 		transparent = "black"
 	}
 
-	texTemplate := `\documentclass[border=4pt,preview]{standalone}
+	texTemplate := `\documentclass[border=2pt,preview]{standalone}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{amsfonts}
@@ -376,14 +376,11 @@ func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, er
 	stdout.Reset() // Clear stdout buffer for the convert command
 	stderr.Reset() // Clear stderr buffer for the convert command
 
-	// Enhanced convert command with better options for rendering quality
-	cmd = exec.Command("convert", 
+	// Convert PDF to PNG with proper transparency handling
+	cmd = exec.Command("convert",
 		"-density", fmt.Sprintf("%d", dpi),
-		"-quality", "100",
 		"-trim",             // Remove any excess whitespace
 		"+repage",           // Reset the page after trimming
-		"-bordercolor", transparent,
-		"-border", "1x1",    // Add a tiny border for better spacing
 		"-transparent", transparent,
 		pdfFile, pngFile)
 	cmd.Stdout = &stdout
@@ -431,21 +428,19 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
     debugEnv := os.Getenv("DML_DEBUG")
     isDebug := debugEnv == "1" || debugEnv == "true" || debugEnv == "yes"
 
-    actualDstRows := 0
+    // Set default rows based on inline vs display math, honoring user preferences
     if userTargetRows > 0 {
-        actualDstRows = userTargetRows
-    } else { // User did not specify a size, use our defaults
+        // User specified a size - honor it exactly
+        opts.DstRows = uint32(userTargetRows)
+    } else {
+        // Use sensible defaults
         if isDisplayMath {
-            // For display math, 0 might let rasterm/kitty decide size, or pick a larger default.
-            // Let's use 0 for auto-sizing display math by default if not specified.
-            actualDstRows = 0
-        } else { // Inline math
-            actualDstRows = 1 // Default to 1 row for inline math
+            // For display math, let Kitty decide the size
+            // Auto-sizing (0) works well for display math
+        } else {
+            // For inline math, always use 1 row
+            opts.DstRows = 1
         }
-    }
-
-    if actualDstRows > 0 {
-        opts.DstRows = uint32(actualDstRows)
     }
 
 	// rasterm.KittyCopyPNGInline expects an io.Reader for the image data.
@@ -457,8 +452,8 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 	kittyStr := sb.String()
 
 	if isDebug {
-		fmt.Fprintf(os.Stderr, "DEBUG: Generated Kitty protocol with options: rows=%d, isDisplay=%v\n",
-			actualDstRows, isDisplayMath)
+		fmt.Fprintf(os.Stderr, "DEBUG: Generated Kitty protocol with options: rows=%v, isDisplay=%v\n",
+			opts.DstRows, isDisplayMath)
 	}
 
 	// Handle newlines for display math and inline math differently
@@ -469,11 +464,11 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 		// For inline math, ensure there are no trailing newlines or special characters
 		kittyStr = strings.TrimRight(kittyStr, "\n")
 	}
-	
+
 	// Remove any unwanted characters that might be present in the Kitty protocol output
 	kittyStr = strings.TrimSuffix(kittyStr, "%")
 	kittyStr = strings.TrimSuffix(kittyStr, "\x00")
-	
+
 	return kittyStr, nil
 }
 
@@ -532,19 +527,19 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 
     	var sb strings.Builder
     	renderMarkdownAST(docNode, &sb)
-    	
+
 	// Get the raw string from the builder
 	// Apply Markdown formatting to the final processed string.
 	result := sb.String()
-	
+
 	// Process any escape characters that might appear in the output
 	result = strings.ReplaceAll(result, "\\n", "\n") // Replace escaped newlines
 	result = strings.ReplaceAll(result, "\\%", "%")  // Replace escaped percent signs
-	
+
 	// Clean up any unexpected trailing characters
-	result = strings.TrimSuffix(result, "%")  
+	result = strings.TrimSuffix(result, "%")
 	result = strings.TrimSuffix(result, "\x00")
-	
+
 	return result
     }
 
@@ -1025,11 +1020,11 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 
 					// Apply Markdown formatting to the processed line.
 					finalLineOutput := applyMarkdownFormatting(processedLine)
-					
+
 					// Remove any trailing special characters that might appear
 					finalLineOutput = strings.TrimSuffix(finalLineOutput, "%")
 					finalLineOutput = strings.TrimSuffix(finalLineOutput, "\x00")
-					
+
 					// Make sure we keep newlines as is
 					if strings.HasSuffix(processedLine, "\n") && !strings.HasSuffix(finalLineOutput, "\n") {
 						finalLineOutput += "\n"
@@ -1068,7 +1063,7 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 			fmt.Fprintln(os.Stderr, "DEBUG: Output streaming finished.")
 		}
 		}
-	
+
 	// Final debug messages if debug mode is enabled
 	if isDebugMode {
 		fmt.Fprintf(os.Stderr, "DEBUG: dml execution completed. If math rendering issues occurred, check for LaTeX or convert errors.")
