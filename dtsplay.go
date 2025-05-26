@@ -417,6 +417,7 @@ func renderMath(latex string, color string, isDisplay bool, dpi int) ([]byte, er
 }
 
 // kittyInline generates the Kitty graphics protocol string for the given image bytes.
+// It carefully handles the output to ensure no unwanted trailing characters appear.
 func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, error) {
     var sb strings.Builder
     opts := rasterm.KittyImgOpts{
@@ -460,9 +461,19 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 			actualDstRows, isDisplayMath)
 	}
 
+	// Handle newlines for display math and inline math differently
 	if isDisplayMath {
-		kittyStr += "\n" // Add a newline after display math images
+		// For display math, ensure there's exactly one trailing newline
+		kittyStr = strings.TrimRight(kittyStr, "\n") + "\n"
+	} else {
+		// For inline math, ensure there are no trailing newlines or special characters
+		kittyStr = strings.TrimRight(kittyStr, "\n")
 	}
+	
+	// Remove any unwanted characters that might be present in the Kitty protocol output
+	kittyStr = strings.TrimSuffix(kittyStr, "%")
+	kittyStr = strings.TrimSuffix(kittyStr, "\x00")
+	
 	return kittyStr, nil
 }
 
@@ -521,7 +532,20 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 
     	var sb strings.Builder
     	renderMarkdownAST(docNode, &sb)
-    	return sb.String()
+    	
+	// Get the raw string from the builder
+	// Apply Markdown formatting to the final processed string.
+	result := sb.String()
+	
+	// Process any escape characters that might appear in the output
+	result = strings.ReplaceAll(result, "\\n", "\n") // Replace escaped newlines
+	result = strings.ReplaceAll(result, "\\%", "%")  // Replace escaped percent signs
+	
+	// Clean up any unexpected trailing characters
+	result = strings.TrimSuffix(result, "%")  
+	result = strings.TrimSuffix(result, "\x00")
+	
+	return result
     }
 
     func main() {
@@ -594,7 +618,7 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 		// Read all of stdin into a single string for full LaTeX mode
 		inputBytes, err := ioutil.ReadAll(os.Stdin)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading standard input: %v\\n", err)
+			fmt.Fprintf(os.Stderr, "Error reading standard input: %v\n", err)
 			os.Exit(1)
 		}
 		inputString := string(inputBytes)
@@ -666,8 +690,8 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 		// Regexes to find delimiters specifically for streaming processing.
 		// These look for the *start* and *end* of delimiters on the current line.
 		// They are different from the global regexes which assume the whole input is available.
-		startDisplayMathRegex := regexp.MustCompile(`\$\$|\\\[`)
-		endDisplayMathRegex := regexp.MustCompile(`\$\$|\\\]`)
+		startDisplayMathRegex := regexp.MustCompile(`(?:^|\s)\$\$|\\\[`)
+		endDisplayMathRegex := regexp.MustCompile(`\$\$(?:$|\s)|\\\]`)
 
 		// Set environment variable for renderMath debug flag if we're in debug mode
 		if isDebugMode {
@@ -682,7 +706,7 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 			inputLine, err := reader.ReadString('\n')
 
 			if err != nil && err != io.EOF {
-				fmt.Fprintf(os.Stderr, "Error reading input line: %v\\n", err)
+				fmt.Fprintf(os.Stderr, "Error reading input line: %v\n", err)
 				writer.Flush() // Flush any pending output
 				os.Exit(1)
 			}
@@ -754,12 +778,12 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 							if content == "" { return match }
 							img, rErr := renderMath(content, effectiveColor, false, effectiveDPI)
 							if rErr != nil {
-								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\\n", content, rErr)
+								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\n", content, rErr)
 								return match
 							}
 							kStr, kErr := kittyInline(img, false, effectiveSize)
 							if kErr != nil {
-								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\\n", content, kErr)
+								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\n", content, kErr)
 								return match
 							}
 							return kStr
@@ -769,12 +793,12 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 							if content == "" { return match }
 							img, rErr := renderMath(content, effectiveColor, false, effectiveDPI)
 							if rErr != nil {
-								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\\n", content, rErr)
+								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\n", content, rErr)
 								return match
 							}
 							kStr, kErr := kittyInline(img, false, effectiveSize)
 							if kErr != nil {
-								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\\n", content, kErr)
+								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\n", content, kErr)
 								return match
 							}
 							return kStr
@@ -816,12 +840,12 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 							if content == "" { return match }
 							img, rErr := renderMath(content, effectiveColor, false, effectiveDPI)
 							if rErr != nil {
-								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\\n", content, rErr)
+								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\n", content, rErr)
 								return match
 							}
 							kStr, kErr := kittyInline(img, false, effectiveSize)
 							if kErr != nil {
-								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\\n", content, kErr)
+								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\n", content, kErr)
 								return match
 							}
 							return kStr
@@ -831,12 +855,12 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 							if content == "" { return match }
 							img, rErr := renderMath(content, effectiveColor, false, effectiveDPI)
 							if rErr != nil {
-								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\\n", content, rErr)
+								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\n", content, rErr)
 								return match
 							}
 							kStr, kErr := kittyInline(img, false, effectiveSize)
 							if kErr != nil {
-								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\\n", content, kErr)
+								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\n", content, kErr)
 								return match
 							}
 							return kStr
@@ -869,12 +893,12 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 							if content == "" { return match }
 							img, rErr := renderMath(content, effectiveColor, false, effectiveDPI)
 							if rErr != nil {
-								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\\n", content, rErr)
+								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\n", content, rErr)
 								return match
 							}
 							kStr, kErr := kittyInline(img, false, effectiveSize)
 							if kErr != nil {
-								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\\n", content, kErr)
+								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\n", content, kErr)
 								return match
 							}
 							return kStr
@@ -884,12 +908,12 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 							if content == "" { return match }
 							img, rErr := renderMath(content, effectiveColor, false, effectiveDPI)
 							if rErr != nil {
-								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\\n", content, rErr)
+								fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\n", content, rErr)
 								return match
 							}
 							kStr, kErr := kittyInline(img, false, effectiveSize)
 							if kErr != nil {
-								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\\n", content, kErr)
+								fmt.Fprintf(os.Stderr, "Error generating Kitty protocol for inline math ('%s'): %v\n", content, kErr)
 								return match
 							}
 							return kStr
@@ -1001,6 +1025,15 @@ func kittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 
 					// Apply Markdown formatting to the processed line.
 					finalLineOutput := applyMarkdownFormatting(processedLine)
+					
+					// Remove any trailing special characters that might appear
+					finalLineOutput = strings.TrimSuffix(finalLineOutput, "%")
+					finalLineOutput = strings.TrimSuffix(finalLineOutput, "\x00")
+					
+					// Make sure we keep newlines as is
+					if strings.HasSuffix(processedLine, "\n") && !strings.HasSuffix(finalLineOutput, "\n") {
+						finalLineOutput += "\n"
+					}
 
 					// Write the processed line to the buffered writer.
 					writer.WriteString(finalLineOutput)
