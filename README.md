@@ -8,7 +8,7 @@ The codebase is organized in a modular structure:
 
 - `cmd/dml/` - Main application entry point and CLI processing
 - `internal/` - Core implementation packages:
-  - `color/` - Color processing and management
+  - `color/` - Colour processing and management
   - `latex/` - LaTeX rendering and document generation
   - `markdown/` - Markdown processing and formatting
   - `regex/` - Regular expression patterns for text analysis
@@ -20,7 +20,7 @@ The codebase is organized in a modular structure:
 *   Renders display LaTeX math (`$$formula$$`) as images.
 *   Converts Markdown `*italic*` / `_italic_` to italicized text (requires terminal/font support for ANSI italics).
 *   Converts Markdown `**bold**` / `__bold__` to bold text.
-*   Customizable text color for rendered LaTeX images.
+*   Customizable text colour for rendered LaTeX images.
 *   Passes through unrecognized Markdown and other text.
 
 ## Prerequisites
@@ -80,8 +80,8 @@ some_command | dml [OPTIONS]
 
 **Options:**
 
-*   `--colour COLOR`: Set the text colour for rendered LaTeX images. `COLOR` can be a named colour (e.g., "red", "blue") or a hex code (e.g., "#FF0000", "#0F0"). Defaults to "white".
-*   `-c COLOR`: Short alias for `--colour`. If both are provided, `-c` takes precedence.
+*   `--colour COLOUR`: Set the text colour for rendered LaTeX images. `COLOUR` can be a named colour (e.g., "red", "blue") or a hex code (e.g., "#FF0000", "#0F0"). Defaults to "white".
+*   `-c COLOUR`: Short alias for `--colour`. If both are provided, `-c` takes precedence.
 *   `--size SIZE`: Set the target terminal row height for rendered LaTeX images. `SIZE` is an integer. A value of `0` (default) uses 1 row for inline math and auto-sizes display math.
 *   `-s SIZE`: Short alias for `--size`. If both are provided, `-s` takes precedence.
 *   `--dpi DPI_VALUE`: Set the DPI (dots per inch) for rendering LaTeX images. `DPI_VALUE` is an integer. Defaults to `300`. Higher values produce sharper images but may be slower.
@@ -106,7 +106,7 @@ some_command | dml [OPTIONS]
     echo 'This is **bold text** and inline math $E=mc^2$.' | dml --colour blue
     ```
 
-3.  **Using the short color flag:**
+3.  **Using the short colour flag:**
     ```bash
     echo 'Display math: $$ \sum_{i=1}^{n} i = \frac{n(n+1)}{2} $$' | dml -c "#00FF00"
     ```
@@ -139,7 +139,7 @@ To build DML from source:
 
 ```bash
 # Clone the repository
-git clone <repository_url>
+git clone https://github.com/JamieLittle16/dml
 cd dml
 
 # Build the binary

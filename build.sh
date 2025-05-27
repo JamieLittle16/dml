@@ -3,19 +3,53 @@ set -e
 
 # Script to build DML into a single binary
 
-echo "Building DML..."
+# Show usage if requested
+if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+    echo "Usage: $0 [command]"
+    echo ""
+    echo "Commands:"
+    echo "  (none)        Build the DML binary"
+    echo "  install       Install DML system-wide (requires sudo)"
+    echo "  install local Install DML to user's ~/.local directory"
+    echo "  test          Run all tests"
+    echo "  test-nomathjax Run tests that don't require LaTeX/ImageMagick"
+    echo "  help          Show this help message"
+    exit 0
+fi
 
 # Navigate to project root
 cd "$(dirname "$0")"
 
-# Build the binary
-go build -o dml cmd/dml/main.go
+# Process test command
+if [ "$1" = "test" ]; then
+    echo "Running all tests..."
+    go test -v ./...
+    exit $?
+fi
 
-echo "Build successful! Binary created at: ./dml"
+# Process test-nomathjax command
+if [ "$1" = "test-nomathjax" ]; then
+    echo "Running tests without LaTeX dependencies..."
+    SKIP_LATEX_TESTS=1 go test -v ./...
+    exit $?
+fi
+
+# Build the binary (default action)
+if [ "$1" = "" ] || [ "$1" = "build" ]; then
+    echo "Building DML..."
+    go build -o dml cmd/dml/main.go
+    echo "Build successful! Binary created at: ./dml"
+fi
 
 # Check for install command
 if [ "$1" = "install" ]; then
     echo "Installing DML..."
+    
+    # Build first if the binary doesn't exist
+    if [ ! -f "./dml" ]; then
+        echo "Building DML first..."
+        go build -o dml cmd/dml/main.go
+    fi
     
     # Determine install location
     if [ "$2" = "local" ]; then
@@ -44,4 +78,7 @@ if [ "$1" = "install" ]; then
     fi
 fi
 
-echo "Done!"
+# Only print "Done!" for commands that don't have their own output
+if [ "$1" = "" ] || [ "$1" = "build" ] || [ "$1" = "install" ]; then
+    echo "Done!"
+fi
