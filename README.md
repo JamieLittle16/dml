@@ -37,7 +37,7 @@ Before using DML, you need the following installed on your system:
 1.  **Clone the Repository (if applicable)**:
     If you have this project in a Git repository:
     ```bash
-    git clone <repository_url>
+    git clone https://github.com/JamieLittle16/dml
     cd dml
     ```
     If you just have the source files, navigate to the `Projects/dml` directory.
@@ -56,7 +56,7 @@ Before using DML, you need the following installed on your system:
     ./build.sh install
     ```
     This will install the binary to `/usr/local/bin/dml` and the man page to `/usr/local/share/man/man1/dml.1.gz`.
-    
+
     *Note: This requires sudo access. After installation, you might need to run `sudo mandb` (or `rehash` in some shells) for the system to recognize the new man page and command.*
 
 4.  **User-Specific Installation (Optional)**:
@@ -65,7 +65,7 @@ Before using DML, you need the following installed on your system:
     ./build.sh install local
     ```
     This will install the binary to `$HOME/.local/bin/dml` and the man page to `$HOME/.local/share/man/man1/dml.1.gz`.
-    
+
     *Note: Ensure `$HOME/.local/bin` is in your PATH and `$HOME/.local/share/man` is in your MANPATH environment variable.*
 
 ## Usage
