@@ -2,6 +2,18 @@
 
 DML is a command-line tool that reads text from standard input, processes basic Markdown (bold/italic) and LaTeX math expressions (both inline and display), and prints the result to standard output. LaTeX math is rendered as images using the Kitty terminal graphics protocol.
 
+## Code Structure
+
+The codebase is organized in a modular structure:
+
+- `cmd/dml/` - Main application entry point and CLI processing
+- `internal/` - Core implementation packages:
+  - `color/` - Color processing and management
+  - `latex/` - LaTeX rendering and document generation
+  - `markdown/` - Markdown processing and formatting
+  - `regex/` - Regular expression patterns for text analysis
+  - `terminal/` - Terminal output and Kitty protocol implementation
+
 ## Features
 
 *   Renders inline LaTeX math (`$formula$`) as images.
@@ -33,33 +45,28 @@ Before using DML, you need the following installed on your system:
 2.  **Build the Binary**:
     From the `Projects/dml` directory:
     ```bash
-    go build -o dml dtsplay.go
+    ./build.sh
     ```
     This will create an executable file named `dml` in the current directory.
 
 3.  **Install the Binary and Man Page (System-Wide)**:
-    To make `dml` available globally and install its man page, run the following commands from the `Projects/dml` directory (you will likely need `sudo`):
+    To make `dml` available globally and install its man page, run the following commands from the `Projects/dml` directory:
 
     ```bash
-    sudo cp dml /usr/local/bin/dml
-    sudo mkdir -p /usr/local/share/man/man1
-    sudo cp man/dml.1 /usr/local/share/man/man1/dml.1
-    sudo gzip /usr/local/share/man/man1/dml.1
+    ./build.sh install
     ```
-    *Note: If `/usr/local/share/man/man1` does not exist, the `mkdir -p` command will create it.*
-    *After installation, you might need to run `sudo mandb` (or `rehash` in some shells) for the system to recognize the new man page and command.*
+    This will install the binary to `/usr/local/bin/dml` and the man page to `/usr/local/share/man/man1/dml.1.gz`.
+    
+    *Note: This requires sudo access. After installation, you might need to run `sudo mandb` (or `rehash` in some shells) for the system to recognize the new man page and command.*
 
 4.  **User-Specific Installation (Optional)**:
     Alternatively, you can install it to a user-specific directory like `$HOME/.local/bin` (ensure this is in your PATH):
     ```bash
-    mkdir -p $HOME/.local/bin
-    cp dml $HOME/.local/bin/dml
-    # For the man page:
-    mkdir -p $HOME/.local/share/man/man1
-    cp man/dml.1 $HOME/.local/share/man/man1/dml.1
-    gzip $HOME/.local/share/man/man1/dml.1
-    # Ensure $HOME/.local/share/man is in your MANPATH environment variable.
+    ./build.sh install local
     ```
+    This will install the binary to `$HOME/.local/bin/dml` and the man page to `$HOME/.local/share/man/man1/dml.1.gz`.
+    
+    *Note: Ensure `$HOME/.local/bin` is in your PATH and `$HOME/.local/share/man` is in your MANPATH environment variable.*
 
 ## Usage
 
@@ -123,6 +130,24 @@ some_command | dml [OPTIONS]
     ```bash
     man dml
     ```
+
+## Development
+
+### Building from Source
+
+To build DML from source:
+
+```bash
+# Clone the repository
+git clone <repository_url>
+cd dml
+
+# Build the binary
+./build.sh
+
+# Run tests (if available)
+go test ./...
+```
 
 ## Author
 
