@@ -4,10 +4,10 @@ This directory contains the core implementation packages for DML that are used i
 
 ## Packages
 
-- `color/` - Color management functionality for LaTeX rendering
-  - Handles color name to hex conversion
-  - Provides complementary color calculation
-  - Formats color definitions for LaTeX documents
+- `colour/` - Colour management functionality for LaTeX rendering
+  - Handles colour name to hex conversion
+  - Provides complementary colour calculation
+  - Formats colour definitions for LaTeX documents
 
 - `latex/` - LaTeX document rendering and processing
   - Contains LaTeX document templates

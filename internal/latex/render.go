@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"dml/internal/color"
+	"dml/internal/colour"
 )
 
 var isDebug bool
@@ -20,7 +20,7 @@ func SetDebug(debug bool) {
 }
 
 // RenderMath renders a LaTeX math expression to a PNG image
-func RenderMath(latex string, colorStr string, isDisplay bool, dpi int) ([]byte, error) {
+func RenderMath(latex string, colourStr string, isDisplay bool, dpi int) ([]byte, error) {
 	// Skip empty latex content
 	latex = strings.TrimSpace(latex)
 	if latex == "" {
@@ -36,38 +36,38 @@ func RenderMath(latex string, colorStr string, isDisplay bool, dpi int) ([]byte,
 		fmt.Fprintf(os.Stderr, "DEBUG: renderMath called with isDisplay=%v, dpi=%d\n", isDisplay, dpi)
 	}
 
-	// Set default color and prepare background color
-	if colorStr == "" {
-		colorStr = "white"
+	// Set default colour and prepare background colour
+	if colourStr == "" {
+		colourStr = "white"
 	}
 	bg := "black"
 	transparent := "black"
-	latexColorDefs := ""
+	latexcolourDefs := ""
 
-	// Process colors
+	// Process colours
 	if isDebug {
-		fmt.Fprintf(os.Stderr, "DEBUG: Processing color: '%s'\n", colorStr)
+		fmt.Fprintf(os.Stderr, "DEBUG: Processing colour: '%s'\n", colourStr)
 	}
-	
-	hexColor := color.ToHex(colorStr)
-	if hexColor != "" {
-		comp := color.ComplementHex(hexColor)
-		latexColorDefs = color.LaTeXColorDef("usercolor", hexColor) + color.LaTeXColorDef("bgcolor", comp)
-		colorStr = "usercolor"
-		bg = "bgcolor"
+
+	hexcolour := colour.ToHex(colourStr)
+	if hexcolour != "" {
+		comp := colour.ComplementHex(hexcolour)
+		latexcolourDefs = colour.LaTeXcolourDef("usercolour", hexcolour) + colour.LaTeXcolourDef("bgcolour", comp)
+		colourStr = "usercolour"
+		bg = "bgcolour"
 		transparent = comp
-		
+
 		if isDebug {
-			fmt.Fprintf(os.Stderr, "DEBUG: Color converted to hex: '%s', complement: '%s'\n", hexColor, comp)
+			fmt.Fprintf(os.Stderr, "DEBUG: colour converted to hex: '%s', complement: '%s'\n", hexcolour, comp)
 		}
 	} else {
 		// fallback: use white text on black bg
-		colorStr = "white"
+		colourStr = "white"
 		bg = "black"
 		transparent = "black"
-		
+
 		if isDebug {
-			fmt.Fprintf(os.Stderr, "DEBUG: Using fallback colors: text='%s', bg='%s'\n", colorStr, bg)
+			fmt.Fprintf(os.Stderr, "DEBUG: Using fallback colours: text='%s', bg='%s'\n", colourStr, bg)
 		}
 	}
 
@@ -84,21 +84,21 @@ func RenderMath(latex string, colorStr string, isDisplay bool, dpi int) ([]byte,
 			fmt.Fprintf(os.Stderr, "DEBUG: Creating inline math content with $ ... $\n")
 		}
 	}
-	
+
 	// Fill the template
-	tex := fmt.Sprintf(TexTemplate, latexColorDefs, bg, colorStr, mathContent)
+	tex := fmt.Sprintf(TexTemplate, latexcolourDefs, bg, colourStr, mathContent)
 
 	// Create temporary directory
 	dir, err := ioutil.TempDir("", "dml")
 	if err != nil {
 		return nil, err
 	}
-	
+
 	texFile := dir + "/eq.tex"
 	if isDebug {
 		fmt.Fprintf(os.Stderr, "DEBUG: Created temp directory for LaTeX rendering: %s\n", dir)
 	}
-	
+
 	// Write the TeX file
 	if err := ioutil.WriteFile(texFile, []byte(tex), 0644); err != nil {
 		os.RemoveAll(dir) // Clean up if tex file writing fails
@@ -112,7 +112,7 @@ func RenderMath(latex string, colorStr string, isDisplay bool, dpi int) ([]byte,
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		// If pdflatex fails, do not remove the temp directory so logs can be inspected
-		return nil, fmt.Errorf("pdflatex failed for '%s': %v\nLaTeX STDOUT:\n%s\nLaTeX STDERR:\n%s\nTemp dir: %s", 
+		return nil, fmt.Errorf("pdflatex failed for '%s': %v\nLaTeX STDOUT:\n%s\nLaTeX STDERR:\n%s\nTemp dir: %s",
 			latex, err, stdout.String(), stderr.String(), dir)
 	}
 
@@ -134,7 +134,7 @@ func RenderMath(latex string, colorStr string, isDisplay bool, dpi int) ([]byte,
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("convert command failed for PDF '%s': %v\nConverter STDOUT:\n%s\nConverter STDERR:\n%s\nTemp dir: %s", 
+		return nil, fmt.Errorf("convert command failed for PDF '%s': %v\nConverter STDOUT:\n%s\nConverter STDERR:\n%s\nTemp dir: %s",
 			pdfFile, err, stdout.String(), stderr.String(), dir)
 	}
 
@@ -143,10 +143,10 @@ func RenderMath(latex string, colorStr string, isDisplay bool, dpi int) ([]byte,
 		if isDebug {
 			fmt.Fprintf(os.Stderr, "DEBUG: PNG file not found after conversion: %s\n", pngFile)
 		}
-		return nil, fmt.Errorf("convert command appeared to succeed but did not create PNG '%s'.\nConverter STDOUT:\n%s\nConverter STDERR:\n%s\nTemp dir: %s\nStat error: %v", 
+		return nil, fmt.Errorf("convert command appeared to succeed but did not create PNG '%s'.\nConverter STDOUT:\n%s\nConverter STDERR:\n%s\nTemp dir: %s\nStat error: %v",
 			pngFile, stdout.String(), stderr.String(), dir, statErr)
 	}
-	
+
 	if isDebug {
 		fmt.Fprintf(os.Stderr, "DEBUG: PNG file successfully created: %s\n", pngFile)
 	}
@@ -162,50 +162,50 @@ func RenderMath(latex string, colorStr string, isDisplay bool, dpi int) ([]byte,
 }
 
 // RenderFullDocument renders an entire document as a single LaTeX image
-func RenderFullDocument(latexBody string, colorStr string, dpi int) ([]byte, error) {
-	if colorStr == "" {
-		colorStr = "white"
+func RenderFullDocument(latexBody string, colourStr string, dpi int) ([]byte, error) {
+	if colourStr == "" {
+		colourStr = "white"
 	}
 	bg := "black"
 	transparent := "black"
-	latexColorDefs := ""
+	latexcolourDefs := ""
 
-	// Process colors
+	// Process colours
 	if isDebug {
-		fmt.Fprintf(os.Stderr, "DEBUG: Processing color for full document: '%s'\n", colorStr)
+		fmt.Fprintf(os.Stderr, "DEBUG: Processing colour for full document: '%s'\n", colourStr)
 	}
-	
-	hexColor := color.ToHex(colorStr)
-	if hexColor != "" {
-		comp := color.ComplementHex(hexColor)
-		latexColorDefs = color.LaTeXColorDef("usercolor", hexColor) + color.LaTeXColorDef("bgcolor", comp)
-		colorStr = "usercolor"
-		bg = "bgcolor"
+
+	hexcolour := colour.ToHex(colourStr)
+	if hexcolour != "" {
+		comp := colour.ComplementHex(hexcolour)
+		latexcolourDefs = colour.LaTeXcolourDef("usercolour", hexcolour) + colour.LaTeXcolourDef("bgcolour", comp)
+		colourStr = "usercolour"
+		bg = "bgcolour"
 		transparent = comp
-		
+
 		if isDebug {
-			fmt.Fprintf(os.Stderr, "DEBUG: Full doc color converted to hex: '%s', complement: '%s'\n", hexColor, comp)
+			fmt.Fprintf(os.Stderr, "DEBUG: Full doc colour converted to hex: '%s', complement: '%s'\n", hexcolour, comp)
 		}
 	} else {
 		// fallback: use white text on black bg
-		colorStr = "white"
+		colourStr = "white"
 		bg = "black"
 		transparent = "black"
-		
+
 		if isDebug {
-			fmt.Fprintf(os.Stderr, "DEBUG: Using fallback colors for full doc: text='%s', bg='%s'\n", colorStr, bg)
+			fmt.Fprintf(os.Stderr, "DEBUG: Using fallback colours for full doc: text='%s', bg='%s'\n", colourStr, bg)
 		}
 	}
 
 	// Fill the template
-	tex := fmt.Sprintf(FullDocTemplate, latexColorDefs, bg, colorStr, latexBody)
+	tex := fmt.Sprintf(FullDocTemplate, latexcolourDefs, bg, colourStr, latexBody)
 
 	// Create temporary directory
 	dir, err := ioutil.TempDir("", "dml-full")
 	if err != nil {
 		return nil, err
 	}
-	
+
 	texFile := dir + "/fulldoc.tex"
 	if err := ioutil.WriteFile(texFile, []byte(tex), 0644); err != nil {
 		os.RemoveAll(dir)
@@ -218,7 +218,7 @@ func RenderFullDocument(latexBody string, colorStr string, dpi int) ([]byte, err
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("pdflatex failed for full document: %v\nLaTeX STDOUT:\n%s\nLaTeX STDERR:\n%s\nTemp dir: %s", 
+		return nil, fmt.Errorf("pdflatex failed for full document: %v\nLaTeX STDOUT:\n%s\nLaTeX STDERR:\n%s\nTemp dir: %s",
 			err, stdout.String(), stderr.String(), dir)
 	}
 
@@ -227,7 +227,7 @@ func RenderFullDocument(latexBody string, colorStr string, dpi int) ([]byte, err
 	pngFile := dir + "/fulldoc.png"
 	stdout.Reset()
 	stderr.Reset()
-	
+
 	cmd = exec.Command("convert",
 		"-density", fmt.Sprintf("%d", dpi),
 		"-quality", "100",
@@ -238,13 +238,13 @@ func RenderFullDocument(latexBody string, colorStr string, dpi int) ([]byte, err
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("convert command failed for PDF '%s': %v\nConverter STDOUT:\n%s\nConverter STDERR:\n%s\nTemp dir: %s", 
+		return nil, fmt.Errorf("convert command failed for PDF '%s': %v\nConverter STDOUT:\n%s\nConverter STDERR:\n%s\nTemp dir: %s",
 			pdfFile, err, stdout.String(), stderr.String(), dir)
 	}
 
 	// Check if PNG file exists
 	if _, statErr := os.Stat(pngFile); os.IsNotExist(statErr) {
-		return nil, fmt.Errorf("convert command appeared to succeed but did not create PNG '%s'.\nConverter STDOUT:\n%s\nConverter STDERR:\n%s\nTemp dir: %s", 
+		return nil, fmt.Errorf("convert command appeared to succeed but did not create PNG '%s'.\nConverter STDOUT:\n%s\nConverter STDERR:\n%s\nTemp dir: %s",
 			pngFile, stdout.String(), stderr.String(), dir)
 	}
 

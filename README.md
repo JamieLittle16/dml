@@ -4,11 +4,11 @@ DML is a command-line tool that reads text from standard input, processes basic 
 
 ## Code Structure
 
-The codebase is organized in a modular structure:
+The codebase is organised in a modular structure:
 
 - `cmd/dml/` - Main application entry point and CLI processing
 - `internal/` - Core implementation packages:
-  - `color/` - Colour processing and management
+  - `colour/` - Colour processing and management
   - `latex/` - LaTeX rendering and document generation
   - `markdown/` - Markdown processing and formatting
   - `regex/` - Regular expression patterns for text analysis
@@ -18,9 +18,9 @@ The codebase is organized in a modular structure:
 
 *   Renders inline LaTeX math (`$formula$`) as images.
 *   Renders display LaTeX math (`$$formula$$`) as images.
-*   Converts Markdown `*italic*` / `_italic_` to italicized text (requires terminal/font support for ANSI italics).
+*   Converts Markdown `*italic*` / `_italic_` to italicised text (requires terminal/font support for ANSI italics).
 *   Converts Markdown `**bold**` / `__bold__` to bold text.
-*   Customizable text colour for rendered LaTeX images.
+*   Customisable text colour for rendered LaTeX images.
 *   Passes through unrecognized Markdown and other text.
 
 ## Prerequisites
@@ -57,7 +57,7 @@ Before using DML, you need the following installed on your system:
     ```
     This will install the binary to `/usr/local/bin/dml` and the man page to `/usr/local/share/man/man1/dml.1.gz`.
 
-    *Note: This requires sudo access. After installation, you might need to run `sudo mandb` (or `rehash` in some shells) for the system to recognize the new man page and command.*
+    *Note: This requires sudo access. After installation, you might need to run `sudo mandb` (or `rehash` in some shells) for the system to recognise the new man page and command.*
 
 4.  **User-Specific Installation (Optional)**:
     Alternatively, you can install it to a user-specific directory like `$HOME/.local/bin` (ensure this is in your PATH):
@@ -101,7 +101,7 @@ some_command | dml [OPTIONS]
     dml < my_document.md
     ```
 
-2.  **Pipe from `echo` with colored LaTeX:**
+2.  **Pipe from `echo` with coloured LaTeX:**
     ```bash
     echo 'This is **bold text** and inline math $E=mc^2$.' | dml --colour blue
     ```

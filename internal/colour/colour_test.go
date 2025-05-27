@@ -1,10 +1,10 @@
-package color
+package colour
 
 import (
 	"testing"
 )
 
-func TestIsHexColor(t *testing.T) {
+func TestIsHexcolour(t *testing.T) {
 	tests := []struct {
 		input string
 		want  bool
@@ -24,9 +24,9 @@ func TestIsHexColor(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := IsHexColor(test.input)
+		got := IsHexcolour(test.input)
 		if got != test.want {
-			t.Errorf("IsHexColor(%q) = %v, want %v", test.input, got, test.want)
+			t.Errorf("IsHexcolour(%q) = %v, want %v", test.input, got, test.want)
 		}
 	}
 }
@@ -55,7 +55,7 @@ func TestToHex(t *testing.T) {
 	}
 }
 
-func TestExpandHexColor(t *testing.T) {
+func TestExpandHexcolour(t *testing.T) {
 	tests := []struct {
 		input string
 		want  string
@@ -69,9 +69,9 @@ func TestExpandHexColor(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := expandHexColor(test.input)
+		got := expandHexcolour(test.input)
 		if got != test.want {
-			t.Errorf("expandHexColor(%q) = %q, want %q", test.input, got, test.want)
+			t.Errorf("expandHexcolour(%q) = %q, want %q", test.input, got, test.want)
 		}
 	}
 }
@@ -98,21 +98,21 @@ func TestComplementHex(t *testing.T) {
 	}
 }
 
-func TestLaTeXColorDef(t *testing.T) {
+func TestLaTeXcolourDef(t *testing.T) {
 	tests := []struct {
 		name  string
-		color string
+		colour string
 		want  string
 	}{
-		{"text", "#FF0000", "\\definecolor{text}{HTML}{FF0000}\n"},
-		{"background", "#00FF00", "\\definecolor{background}{HTML}{00FF00}\n"},
-		{"highlight", "#0000FF", "\\definecolor{highlight}{HTML}{0000FF}\n"},
+		{"text", "#FF0000", "\\definecolour{text}{HTML}{FF0000}\n"},
+		{"background", "#00FF00", "\\definecolour{background}{HTML}{00FF00}\n"},
+		{"highlight", "#0000FF", "\\definecolour{highlight}{HTML}{0000FF}\n"},
 	}
 
 	for _, test := range tests {
-		got := LaTeXColorDef(test.name, test.color)
+		got := LaTeXcolourDef(test.name, test.colour)
 		if got != test.want {
-			t.Errorf("LaTeXColorDef(%q, %q) = %q, want %q", test.name, test.color, got, test.want)
+			t.Errorf("LaTeXcolourDef(%q, %q) = %q, want %q", test.name, test.colour, got, test.want)
 		}
 	}
 }

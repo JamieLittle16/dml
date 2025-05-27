@@ -20,7 +20,7 @@ The package provides two main templates:
 
 The rendering process follows these steps:
 1. Template selection and content preparation
-2. LaTeX document generation with proper color settings
+2. LaTeX document generation with proper colour settings
 3. Compilation using `pdflatex` to create a PDF
 4. Conversion to PNG format using ImageMagick's `convert` utility
 5. Image processing for transparency and proper display

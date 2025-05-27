@@ -33,12 +33,12 @@ func main() {
 
 	flag.Parse() // Parse all flags first
 
-	// Set default color to white and apply overrides if specified
-	effectiveColor := "white"
+	// Set default colour to white and apply overrides if specified
+	effectivecolour := "white"
 	if *cFlag != "" {
-		effectiveColor = *cFlag
+		effectivecolour = *cFlag
 	} else if *colourFlag != "" && *colourFlag != "white" {
-		effectiveColor = *colourFlag
+		effectivecolour = *colourFlag
 	}
 
 	// Determine if short flags -s and -d were explicitly set
@@ -84,9 +84,9 @@ func main() {
 	}
 
 	if isRenderAllLatexMode {
-		processFullDocument(effectiveColor, effectiveSize, effectiveDPI, isDebugMode)
+		processFullDocument(effectivecolour, effectiveSize, effectiveDPI, isDebugMode)
 	} else {
-		processStreamingDocument(effectiveColor, effectiveSize, effectiveDPI, isDebugMode)
+		processStreamingDocument(effectivecolour, effectiveSize, effectiveDPI, isDebugMode)
 	}
 
 	// Final debug messages if debug mode is enabled
@@ -97,7 +97,7 @@ func main() {
 }
 
 // processFullDocument handles the full document rendering mode
-func processFullDocument(effectiveColor string, effectiveSize, effectiveDPI int, isDebugMode bool) {
+func processFullDocument(effectivecolour string, effectiveSize, effectiveDPI int, isDebugMode bool) {
 	if isDebugMode {
 		fmt.Fprintln(os.Stderr, "DEBUG: Reading standard input (full document) for render-all-latex mode...")
 	}
@@ -132,7 +132,7 @@ func processFullDocument(effectiveColor string, effectiveSize, effectiveDPI int,
 	markdown.GenerateLatexFromAST(docNode, &latexBodyBuilder)
 	latexBody := latexBodyBuilder.String()
 
-	img, renderErr := latex.RenderFullDocument(latexBody, effectiveColor, effectiveDPI)
+	img, renderErr := latex.RenderFullDocument(latexBody, effectivecolour, effectiveDPI)
 	if renderErr != nil {
 		fmt.Fprintf(os.Stderr, "Error in full LaTeX rendering mode: %v\n", renderErr)
 		// In full render mode, if LaTeX fails, print the original input so user can debug
@@ -151,7 +151,7 @@ func processFullDocument(effectiveColor string, effectiveSize, effectiveDPI int,
 }
 
 // processStreamingDocument handles the streaming mode with line-by-line processing
-func processStreamingDocument(effectiveColor string, effectiveSize, effectiveDPI int, isDebugMode bool) {
+func processStreamingDocument(effectivecolour string, effectiveSize, effectiveDPI int, isDebugMode bool) {
 	if isDebugMode {
 		fmt.Fprintln(os.Stderr, "DEBUG: Entering standard processing mode (line-by-line streaming with state).")
 	}
@@ -201,7 +201,7 @@ func processStreamingDocument(effectiveColor string, effectiveSize, effectiveDPI
 				if isDebugMode {
 					fmt.Fprintf(os.Stderr, "DEBUG: Attempting to render display math (length: %d chars)\n", len(mathContent))
 				}
-				img, renderErr := latex.RenderMath(mathContent, effectiveColor, true, effectiveDPI)
+				img, renderErr := latex.RenderMath(mathContent, effectivecolour, true, effectiveDPI)
 				if renderErr != nil {
 					fmt.Fprintf(os.Stderr, "ERROR: Rendering display math failed: %v\n", renderErr)
 					// On error, print the un-rendered content as text
@@ -234,7 +234,7 @@ func processStreamingDocument(effectiveColor string, effectiveSize, effectiveDPI
 					if isDebugMode {
 						fmt.Fprintf(os.Stderr, "DEBUG: Processing remaining line after display math: %s\n", strings.TrimSpace(remainingLine))
 					}
-					processedRemaining := processInlineMath(remainingLine, effectiveColor, effectiveSize, effectiveDPI, isDebugMode)
+					processedRemaining := processInlineMath(remainingLine, effectivecolour, effectiveSize, effectiveDPI, isDebugMode)
 					finalRemainingOutput := markdown.ApplyFormatting(processedRemaining)
 					writer.WriteString(finalRemainingOutput)
 				}
@@ -267,7 +267,7 @@ func processStreamingDocument(effectiveColor string, effectiveSize, effectiveDPI
 					if isDebugMode {
 						fmt.Fprintf(os.Stderr, "DEBUG: Processing text before delimiter: %s\n", strings.TrimSpace(beforeDelimiter))
 					}
-					processedBefore := processInlineMath(beforeDelimiter, effectiveColor, effectiveSize, effectiveDPI, isDebugMode)
+					processedBefore := processInlineMath(beforeDelimiter, effectivecolour, effectiveSize, effectiveDPI, isDebugMode)
 					finalBeforeOutput := markdown.ApplyFormatting(processedBefore)
 					writer.WriteString(finalBeforeOutput)
 				}
@@ -290,7 +290,7 @@ func processStreamingDocument(effectiveColor string, effectiveSize, effectiveDPI
 					if isDebugMode {
 						fmt.Fprintf(os.Stderr, "DEBUG: Processing text before single-line math: %s\n", strings.TrimSpace(beforeDelimiter))
 					}
-					processedBefore := processInlineMath(beforeDelimiter, effectiveColor, effectiveSize, effectiveDPI, isDebugMode)
+					processedBefore := processInlineMath(beforeDelimiter, effectivecolour, effectiveSize, effectiveDPI, isDebugMode)
 					finalBeforeOutput := markdown.ApplyFormatting(processedBefore)
 					writer.WriteString(finalBeforeOutput)
 				}
@@ -300,7 +300,7 @@ func processStreamingDocument(effectiveColor string, effectiveSize, effectiveDPI
 				if isDebugMode {
 					fmt.Fprintf(os.Stderr, "DEBUG: Rendering single-line display math: %s\n", strings.TrimSpace(mathContent))
 				}
-				img, renderErr := latex.RenderMath(mathContent, effectiveColor, true, effectiveDPI)
+				img, renderErr := latex.RenderMath(mathContent, effectivecolour, true, effectiveDPI)
 				if renderErr != nil {
 					fmt.Fprintf(os.Stderr, "ERROR: Rendering display math failed: %v\n", renderErr)
 					// On error, print the un-rendered content as text
@@ -326,7 +326,7 @@ func processStreamingDocument(effectiveColor string, effectiveSize, effectiveDPI
 					if isDebugMode {
 						fmt.Fprintf(os.Stderr, "DEBUG: Processing text after single-line math: %s\n", strings.TrimSpace(afterDelimiter))
 					}
-					processedAfter := processInlineMath(afterDelimiter, effectiveColor, effectiveSize, effectiveDPI, isDebugMode)
+					processedAfter := processInlineMath(afterDelimiter, effectivecolour, effectiveSize, effectiveDPI, isDebugMode)
 					finalAfterOutput := markdown.ApplyFormatting(processedAfter)
 					writer.WriteString(finalAfterOutput)
 				}
@@ -334,7 +334,7 @@ func processStreamingDocument(effectiveColor string, effectiveSize, effectiveDPI
 			} else {
 				// No display math delimiters found on this line.
 				// Process for inline math and markdown as before.
-				processedLine := processInlineMath(inputLine, effectiveColor, effectiveSize, effectiveDPI, isDebugMode)
+				processedLine := processInlineMath(inputLine, effectivecolour, effectiveSize, effectiveDPI, isDebugMode)
 
 				// Apply Markdown formatting to the processed line.
 				finalLineOutput := markdown.ApplyFormatting(processedLine)
@@ -383,17 +383,17 @@ func processStreamingDocument(effectiveColor string, effectiveSize, effectiveDPI
 }
 
 // processInlineMath handles inline math expressions in a text line
-func processInlineMath(line, effectiveColor string, effectiveSize, effectiveDPI int, isDebugMode bool) string {
+func processInlineMath(line, effectivecolour string, effectiveSize, effectiveDPI int, isDebugMode bool) string {
 	// Process $...$ inline math
 	processedLine := regex.InlineMath.ReplaceAllStringFunc(line, func(match string) string {
 		content := strings.TrimSpace(match[1 : len(match)-1])
 		if content == "" { return match }
 
 		if isDebugMode {
-			fmt.Fprintf(os.Stderr, "DEBUG: Processing inline math with color: '%s'\n", effectiveColor)
+			fmt.Fprintf(os.Stderr, "DEBUG: Processing inline math with colour: '%s'\n", effectivecolour)
 		}
 
-		img, rErr := latex.RenderMath(content, effectiveColor, false, effectiveDPI)
+		img, rErr := latex.RenderMath(content, effectivecolour, false, effectiveDPI)
 		if rErr != nil {
 			fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\n", content, rErr)
 			return match
@@ -412,10 +412,10 @@ func processInlineMath(line, effectiveColor string, effectiveSize, effectiveDPI 
 		if content == "" { return match }
 
 		if isDebugMode {
-			fmt.Fprintf(os.Stderr, "DEBUG: Processing parenthesis-style inline math with color: '%s'\n", effectiveColor)
+			fmt.Fprintf(os.Stderr, "DEBUG: Processing parenthesis-style inline math with colour: '%s'\n", effectivecolour)
 		}
-		
-		img, rErr := latex.RenderMath(content, effectiveColor, false, effectiveDPI)
+
+		img, rErr := latex.RenderMath(content, effectivecolour, false, effectiveDPI)
 		if rErr != nil {
 			fmt.Fprintf(os.Stderr, "Error rendering inline math ('%s'): %v\n", content, rErr)
 			return match

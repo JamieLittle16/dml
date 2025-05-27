@@ -11,13 +11,13 @@ func TestRenderMath(t *testing.T) {
 	// This test can be run in two modes:
 	// 1. Mock mode (default): Skip actual rendering, just test parameter handling
 	// 2. Full mode: If environment supports it, test actual rendering
-	
+
 	// Always skip actual LaTeX rendering in CI environments
 	skipActualRendering := true
-	
+
 	// Check if we should attempt real rendering
-	if os.Getenv("DML_TEST_FULL_RENDERING") == "1" && 
-	   fileExists("/usr/bin/pdflatex") && 
+	if os.Getenv("DML_TEST_FULL_RENDERING") == "1" &&
+	   fileExists("/usr/bin/pdflatex") &&
 	   fileExists("/usr/bin/convert") {
 		skipActualRendering = false
 	}
@@ -25,7 +25,7 @@ func TestRenderMath(t *testing.T) {
 	tests := []struct {
 		name       string
 		latex      string
-		color      string
+		colour      string
 		isDisplay  bool
 		dpi        int
 		shouldFail bool
@@ -33,7 +33,7 @@ func TestRenderMath(t *testing.T) {
 		{
 			name:       "Empty LaTeX",
 			latex:      "",
-			color:      "white",
+			colour:      "white",
 			isDisplay:  false,
 			dpi:        300,
 			shouldFail: true,
@@ -41,7 +41,7 @@ func TestRenderMath(t *testing.T) {
 		{
 			name:       "Simple inline formula",
 			latex:      "E=mc^2",
-			color:      "white",
+			colour:      "white",
 			isDisplay:  false,
 			dpi:        300,
 			shouldFail: false,
@@ -49,15 +49,15 @@ func TestRenderMath(t *testing.T) {
 		{
 			name:       "Simple display formula",
 			latex:      "E=mc^2",
-			color:      "white",
+			colour:      "white",
 			isDisplay:  true,
 			dpi:        300,
 			shouldFail: false,
 		},
 		{
-			name:       "Custom color",
+			name:       "Custom colour",
 			latex:      "E=mc^2",
-			color:      "red",
+			colour:      "red",
 			isDisplay:  false,
 			dpi:        300,
 			shouldFail: false,
@@ -65,7 +65,7 @@ func TestRenderMath(t *testing.T) {
 		{
 			name:       "Invalid LaTeX",
 			latex:      "\\invalidcommand",
-			color:      "white",
+			colour:      "white",
 			isDisplay:  false,
 			dpi:        300,
 			shouldFail: true,
@@ -74,7 +74,7 @@ func TestRenderMath(t *testing.T) {
 
 	// Set debug mode for detailed output
 	SetDebug(true)
-	
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			if skipActualRendering {
@@ -85,22 +85,22 @@ func TestRenderMath(t *testing.T) {
 				t.Skip("Skipping actual rendering test")
 				return
 			}
-			
+
 			// Only run these tests if we're doing actual rendering
-			img, err := RenderMath(test.latex, test.color, test.isDisplay, test.dpi)
-			
+			img, err := RenderMath(test.latex, test.colour, test.isDisplay, test.dpi)
+
 			if test.shouldFail {
 				if err == nil {
 					t.Errorf("Expected error but got none")
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 				return
 			}
-			
+
 			if len(img) == 0 {
 				t.Errorf("Expected non-empty image data")
 			}
@@ -119,90 +119,89 @@ func TestRenderFullDocument(t *testing.T) {
 	// This test can be run in two modes:
 	// 1. Mock mode (default): Skip actual rendering, just test parameter handling
 	// 2. Full mode: If environment supports it, test actual rendering
-	
+
 	// Always skip actual LaTeX rendering in CI environments
-	skipActualRendering := true
-	
+	// skipActualRendering := true
+
 	// Check if we should attempt real rendering
-	if os.Getenv("DML_TEST_FULL_RENDERING") == "1" && 
-	   fileExists("/usr/bin/pdflatex") && 
+	if os.Getenv("DML_TEST_FULL_RENDERING") == "1" &&
+	   fileExists("/usr/bin/pdflatex") &&
 	   fileExists("/usr/bin/convert") {
-		skipActualRendering = false
+		// skipActualRendering = false
 	}
 
 	tests := []struct {
 		name       string
 		latexBody  string
-		color      string
+		colour      string
 		dpi        int
 		shouldFail bool
 	}{
 		{
 			name:       "Empty document",
 			latexBody:  "",
-			color:      "white",
+			colour:      "white",
 			dpi:        300,
 			shouldFail: false,
 		},
 		{
 			name:       "Simple document",
 			latexBody:  "Hello, world!",
-			color:      "white",
+			colour:      "white",
 			dpi:        300,
 			shouldFail: false,
 		},
 		{
 			name:       "Document with math",
 			latexBody:  "Formula: $E=mc^2$",
-			color:      "white",
+			colour:      "white",
 			dpi:        300,
 			shouldFail: false,
 		},
 		{
-			name:       "Custom color",
-			latexBody:  "Coloured text",
-			color:      "blue",
+			name:       "Custom colour",
+			latexBody:  "coloured text",
+			colour:      "blue",
 			dpi:        300,
 			shouldFail: false,
 		},
 		{
 			name:       "Invalid LaTeX",
 			latexBody:  "\\invalidcommand",
-			color:      "white",
+			colour:      "white",
 			dpi:        300,
 			shouldFail: true,
 		},
 	}
 
-	// Set debug mode for detailed output
+	// Only check if LaTeX executables are available, don't actually render
+	if _, err := os.Stat("/usr/bin/pdflatex"); os.IsNotExist(err) {
+		t.Skip("pdflatex not found, skipping actual LaTeX tests")
+	}
+
+	if _, err := os.Stat("/usr/bin/convert"); os.IsNotExist(err) {
+		t.Skip("convert (ImageMagick) not found, skipping actual LaTeX tests")
+	}
+
+	// Set debug mode to see detailed output
 	SetDebug(true)
-	
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if skipActualRendering {
-				// In mock mode, we just verify parameter handling
-				if test.name == "Invalid LaTeX" && !test.shouldFail {
-					t.Errorf("Invalid LaTeX should fail but test expects success")
-				}
-				t.Skip("Skipping actual rendering test")
-				return
-			}
-			
-			// Only run these tests if we're doing actual rendering
-			img, err := RenderFullDocument(test.latexBody, test.color, test.dpi)
-			
+			img, err := RenderFullDocument(test.latexBody, test.colour, test.dpi)
+
 			if test.shouldFail {
 				if err == nil {
 					t.Errorf("Expected error but got none")
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 				return
 			}
-			
+
 			if len(img) == 0 {
 				t.Errorf("Expected non-empty image data")
 			}
