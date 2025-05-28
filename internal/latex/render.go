@@ -20,7 +20,7 @@ func SetDebug(debug bool) {
 }
 
 // RenderMath renders a LaTeX math expression to a PNG image
-func RenderMath(latex string, colourStr string, isDisplay bool, dpi int) ([]byte, error) {
+func RenderMath(latex string, colourStr string, isDisplay bool, dpi int, fuzzLevel string) ([]byte, error) {
 	// Skip empty latex content
 	latex = strings.TrimSpace(latex)
 	if latex == "" {
@@ -122,14 +122,28 @@ func RenderMath(latex string, colourStr string, isDisplay bool, dpi int) ([]byte
 	stdout.Reset()
 	stderr.Reset()
 
-	// Convert with appropriate options
+	// Determine fuzz level to use
+	effectiveFuzz := fuzzLevel
+	if effectiveFuzz == "" {
+		effectiveFuzz = "1%" // Default fuzz level
+	}
+
+	// Convert with extremely aggressive background removal
 	cmd = exec.Command("convert",
 		"-density", fmt.Sprintf("%d", dpi),
 		"-alpha", "on",
 		"-background", "none",
 		"-trim",
 		"+repage",
+		"-fuzz", effectiveFuzz,
 		"-transparent", transparent,
+		"-fuzz", effectiveFuzz,
+		"-transparent", transparent,
+		"-channel", "Alpha",
+		"-threshold", "50%",
+		"+channel",
+		"-background", "none",
+		"-flatten",
 		pdfFile, pngFile)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -162,7 +176,7 @@ func RenderMath(latex string, colourStr string, isDisplay bool, dpi int) ([]byte
 }
 
 // RenderFullDocument renders an entire document as a single LaTeX image
-func RenderFullDocument(latexBody string, colourStr string, dpi int) ([]byte, error) {
+func RenderFullDocument(latexBody string, colourStr string, dpi int, fuzzLevel string) ([]byte, error) {
 	if colourStr == "" {
 		colourStr = "white"
 	}
@@ -228,12 +242,26 @@ func RenderFullDocument(latexBody string, colourStr string, dpi int) ([]byte, er
 	stdout.Reset()
 	stderr.Reset()
 
+	// Determine fuzz level to use
+	effectiveFuzz := fuzzLevel
+	if effectiveFuzz == "" {
+		effectiveFuzz = "1%" // Default fuzz level
+	}
+
 	cmd = exec.Command("convert",
 		"-density", fmt.Sprintf("%d", dpi),
 		"-quality", "100",
 		"-trim",
 		"+repage",
+		"-fuzz", effectiveFuzz,
 		"-transparent", transparent,
+		"-fuzz", effectiveFuzz,
+		"-transparent", transparent,
+		"-channel", "Alpha",
+		"-threshold", "50%",
+		"+channel",
+		"-background", "none",
+		"-flatten",
 		pdfFile, pngFile)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

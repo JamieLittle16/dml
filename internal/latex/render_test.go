@@ -26,6 +26,7 @@ func TestRenderMath(t *testing.T) {
 		name       string
 		latex      string
 		colour      string
+		fuzzLevel string
 		isDisplay  bool
 		dpi        int
 		shouldFail bool
@@ -87,7 +88,7 @@ func TestRenderMath(t *testing.T) {
 			}
 
 			// Only run these tests if we're doing actual rendering
-			img, err := RenderMath(test.latex, test.colour, test.isDisplay, test.dpi)
+			img, err := RenderMath(test.latex, test.colour, test.isDisplay, test.dpi, test.fuzzLevel)
 
 			if test.shouldFail {
 				if err == nil {
@@ -136,6 +137,7 @@ func TestRenderFullDocument(t *testing.T) {
 		colour      string
 		dpi        int
 		shouldFail bool
+		fuzzLevel string
 	}{
 		{
 			name:       "Empty document",
@@ -143,6 +145,7 @@ func TestRenderFullDocument(t *testing.T) {
 			colour:      "white",
 			dpi:        300,
 			shouldFail: false,
+			fuzzLevel: "10%",
 		},
 		{
 			name:       "Simple document",
@@ -150,6 +153,7 @@ func TestRenderFullDocument(t *testing.T) {
 			colour:      "white",
 			dpi:        300,
 			shouldFail: false,
+			fuzzLevel: "10%",
 		},
 		{
 			name:       "Document with math",
@@ -157,6 +161,7 @@ func TestRenderFullDocument(t *testing.T) {
 			colour:      "white",
 			dpi:        300,
 			shouldFail: false,
+			fuzzLevel: "10%",
 		},
 		{
 			name:       "Custom colour",
@@ -164,6 +169,7 @@ func TestRenderFullDocument(t *testing.T) {
 			colour:      "blue",
 			dpi:        300,
 			shouldFail: false,
+			fuzzLevel: "10%",
 		},
 		{
 			name:       "Invalid LaTeX",
@@ -171,6 +177,7 @@ func TestRenderFullDocument(t *testing.T) {
 			colour:      "white",
 			dpi:        300,
 			shouldFail: true,
+			fuzzLevel: "10%",
 		},
 	}
 
@@ -188,7 +195,7 @@ func TestRenderFullDocument(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			img, err := RenderFullDocument(test.latexBody, test.colour, test.dpi)
+			img, err := RenderFullDocument(test.latexBody, test.colour, test.dpi, test.fuzzLevel)
 
 			if test.shouldFail {
 				if err == nil {
