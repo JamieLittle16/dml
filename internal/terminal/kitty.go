@@ -57,8 +57,8 @@ func KittyInline(img []byte, isDisplayMath bool, userTargetRows int) (string, er
 		kittyStr = strings.TrimRight(kittyStr, "\n") + "\n"
 	} else {
 		// For inline math, ensure there are no trailing newlines
-		kittyStr = strings.TrimRight(kittyStr, "\n")
-	}
+		kittyStr = strings.TrimRight(kittyStr, "\n") + "‎ "
+	} // Add invisible character afterwards to avoid dropped characters
 
 	// Remove null characters that might appear
 	kittyStr = strings.ReplaceAll(kittyStr, "\x00", "")
