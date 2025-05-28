@@ -30,7 +30,7 @@ func main() {
 	lFlag := flag.Bool("l", false, "Short alias for --render-all-latex.")
 	debugFlag := flag.Bool("debug", false, "Enable verbose debug output.")
 	dDebugFlag := flag.Bool("D", false, "Short alias for --debug.")
-	fuzzFlag := flag.String("fuzz-level", "", "Set ImageMagick -fuzz level for transparency (e.g., \"5%\", \"10%\", \"30%\"). Defaults to \"1%\" if not set.")
+	fuzzFlag := flag.String("fuzz-level", "", "Set ImageMagick -fuzz level for transparency (e.g., \"5%\", \"10%\", \"30%\"). Defaults to \"30%\" if not set.")
 	fShortFlag := flag.String("f", "", "Short alias for --fuzz-level. Overrides --fuzz-level if set.")
 
 	flag.Parse() // Parse all flags first

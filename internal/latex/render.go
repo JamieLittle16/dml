@@ -125,7 +125,7 @@ func RenderMath(latex string, colourStr string, isDisplay bool, dpi int, fuzzLev
 	// Determine fuzz level to use
 	effectiveFuzz := fuzzLevel
 	if effectiveFuzz == "" {
-		effectiveFuzz = "1%" // Default fuzz level
+		effectiveFuzz = "30%" // Default fuzz level
 	}
 
 	// Convert with extremely aggressive background removal
