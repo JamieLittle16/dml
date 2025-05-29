@@ -5,8 +5,10 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"dml/internal/colour"
@@ -125,7 +127,15 @@ func RenderMath(latex string, colourStr string, isDisplay bool, dpi int, fuzzLev
 	// Determine fuzz level to use
 	effectiveFuzz := fuzzLevel
 	if effectiveFuzz == "" {
-		effectiveFuzz = "30%" // Default fuzz level
+		// Use dynamic fuzz calculation based on color
+		if hexcolour != "" {
+			effectiveFuzz = colour.GetFuzzLevel(hexcolour)
+			if isDebug {
+				fmt.Fprintf(os.Stderr, "DEBUG: Calculated dynamic fuzz level %s for color %s\n", effectiveFuzz, hexcolour)
+			}
+		} else {
+			effectiveFuzz = "45%" // Default fuzz level for non-hex colors
+		}
 	}
 
 	// Convert with extremely aggressive background removal
@@ -245,7 +255,22 @@ func RenderFullDocument(latexBody string, colourStr string, dpi int, fuzzLevel s
 	// Determine fuzz level to use
 	effectiveFuzz := fuzzLevel
 	if effectiveFuzz == "" {
-		effectiveFuzz = "1%" // Default fuzz level
+		// Use dynamic fuzz calculation based on color, but with a lower baseline for full documents
+		if hexcolour != "" {
+			// For full documents, we generally want a lower fuzz level
+			calculatedFuzz := colour.GetFuzzLevel(hexcolour)
+			// Convert percentage string to float, reduce it, and convert back
+			fuzzValue, _ := strconv.ParseFloat(strings.TrimSuffix(calculatedFuzz, "%"), 64)
+			fuzzValue = math.Max(2.0, fuzzValue * 0.15) // 15% of the regular fuzz value, minimum 2%
+			effectiveFuzz = fmt.Sprintf("%.1f%%", fuzzValue)
+			
+			if isDebug {
+				fmt.Fprintf(os.Stderr, "DEBUG: Calculated dynamic fuzz level %s for full document with color %s\n", 
+					effectiveFuzz, hexcolour)
+			}
+		} else {
+			effectiveFuzz = "2%" // Default fuzz level for non-hex colors in full documents
+		}
 	}
 
 	cmd = exec.Command("convert",
