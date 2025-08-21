@@ -11,6 +11,8 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "  (none)        Build the DML binary"
     echo "  install       Install DML system-wide (requires sudo)"
     echo "  install local Install DML to user's ~/.local directory"
+    echo "  uninstall     Uninstall DML system-wide (requires sudo)"
+    echo "  uninstall local Uninstall DML from user's ~/.local directory"
     echo "  test          Run all tests"
     echo "  test-nomathjax Run tests that don't require LaTeX/ImageMagick"
     echo "  help          Show this help message"
@@ -78,7 +80,48 @@ if [ "$1" = "install" ]; then
     fi
 fi
 
+# Check for uninstall command
+if [ "$1" = "uninstall" ]; then
+    echo "Uninstalling DML..."
+    
+    # Determine uninstall location
+    if [ "$2" = "local" ]; then
+        # Local uninstallation
+        if [ -f "$HOME/.local/bin/dml" ]; then
+            rm "$HOME/.local/bin/dml"
+            echo "DML binary removed from $HOME/.local/bin/dml"
+        else
+            echo "DML binary not found at $HOME/.local/bin/dml"
+        fi
+        
+        # Remove man page
+        if [ -f "$HOME/.local/share/man/man1/dml.1.gz" ]; then
+            rm "$HOME/.local/share/man/man1/dml.1.gz"
+            echo "Man page removed from $HOME/.local/share/man/man1/dml.1.gz"
+        else
+            echo "Man page not found at $HOME/.local/share/man/man1/dml.1.gz"
+        fi
+    else
+        # System-wide uninstallation (requires sudo)
+        if [ -f "/usr/local/bin/dml" ]; then
+            sudo rm "/usr/local/bin/dml"
+            echo "DML binary removed from /usr/local/bin/dml"
+        else
+            echo "DML binary not found at /usr/local/bin/dml"
+        fi
+        
+        # Remove man page
+        if [ -f "/usr/local/share/man/man1/dml.1.gz" ]; then
+            sudo rm "/usr/local/share/man/man1/dml.1.gz"
+            echo "Man page removed from /usr/local/share/man/man1/dml.1.gz"
+        else
+            echo "Man page not found at /usr/local/share/man/man1/dml.1.gz"
+        fi
+        echo "You might need to run 'sudo mandb' to update the manual database."
+    fi
+fi
+
 # Only print "Done!" for commands that don't have their own output
-if [ "$1" = "" ] || [ "$1" = "build" ] || [ "$1" = "install" ]; then
+if [ "$1" = "" ] || [ "$1" = "build" ] || [ "$1" = "install" ] || [ "$1" = "uninstall" ]; then
     echo "Done!"
 fi
