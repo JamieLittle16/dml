@@ -1,6 +1,8 @@
 # DML - Display Markdown & LaTeX
 
-DML is a command-line tool that reads text from standard input, processes basic Markdown (bold/italic) and LaTeX math expressions (both inline and display), and prints the result to standard output. LaTeX math is rendered as images using the Kitty terminal graphics protocol.
+DML is a command-line tool that reads text from standard input, processes Markdown formatting and LaTeX math expressions (both inline and display), and prints the result to standard output. LaTeX math is rendered as images using the Kitty terminal graphics protocol.
+
+**Enhanced Markdown Support:** DML is actively being enhanced to support full CommonMark and GitHub Flavored Markdown (GFM) features including tables, advanced lists, blockquotes, links, and more. See `ENHANCED_MARKDOWN_ROADMAP.md` for details.
 
 ## Code Structure
 
@@ -20,8 +22,19 @@ The codebase is organised in a modular structure:
 *   Renders display LaTeX math (`$$formula$$`) as images.
 *   Converts Markdown `*italic*` / `_italic_` to italicised text (requires terminal/font support for ANSI italics).
 *   Converts Markdown `**bold**` / `__bold__` to bold text.
+*   Basic support for headings, code blocks, and horizontal rules.
 *   Customisable text colour for rendered LaTeX images.
 *   Passes through unrecognized Markdown and other text.
+
+**Enhanced Markdown Support (In Progress):**
+*   🚧 Enhanced list formatting (ordered and unordered)
+*   🚧 Table rendering for terminal and LaTeX output
+*   🚧 Blockquote formatting
+*   🚧 Link rendering (with future clickable support)
+*   🚧 Image placeholder rendering
+*   🚧 GitHub Flavored Markdown (GFM) extensions
+
+*See `ENHANCED_MARKDOWN_ROADMAP.md` for detailed progress and planned features.*
 
 ## Prerequisites
 

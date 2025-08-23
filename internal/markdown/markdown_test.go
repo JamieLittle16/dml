@@ -175,3 +175,52 @@ func TestEmptyNode(t *testing.T) {
 		t.Errorf("Expected empty string for nil node, got: %q", sb.String())
 	}
 }
+
+// Test scaffolded enhanced markdown features
+func TestEnhancedMarkdownScaffolding(t *testing.T) {
+	tests := []struct {
+		name     string
+		markdown string
+		contains string // What the output should contain
+	}{
+		{
+			name:     "Basic list",
+			markdown: "- Item 1\n- Item 2",
+			contains: "•", // Should contain bullet points
+		},
+		{
+			name:     "Basic link",
+			markdown: "[Example](https://example.com)",
+			contains: "Example", // Should contain link text
+		},
+		{
+			name:     "Basic blockquote",
+			markdown: "> This is a quote",
+			contains: "│", // Should contain quote bar
+		},
+		{
+			name:     "Horizontal rule",
+			markdown: "---",
+			contains: "─", // Should contain horizontal line
+		},
+		{
+			name:     "Code block",
+			markdown: "```\ncode here\n```",
+			contains: "code here", // Should contain code content
+		},
+		{
+			name:     "Heading",
+			markdown: "# Title",
+			contains: "Title", // Should contain heading text
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := ApplyFormatting(test.markdown)
+			if !strings.Contains(result, test.contains) {
+				t.Errorf("Expected output to contain %q, got: %q", test.contains, result)
+			}
+		})
+	}
+}
