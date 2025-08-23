@@ -36,8 +36,11 @@ func GenerateLatexFromAST(node ast.Node, sb *strings.Builder) {
 		sb.WriteString(`\textbf{`)
 		processChildren(n)
 		sb.WriteString(`}`)
-	// TODO: Add cases for GFM extensions as they become available:
-	// - Strikethrough (\sout{} - requires ulem package)
+	case *ast.Del: // ~~strikethrough~~
+		sb.WriteString(`\sout{`) // Requires ulem package
+		processChildren(n)
+		sb.WriteString(`}`)
+	// TODO: Add cases for other GFM extensions:
 	// - Task list items (checkbox symbols)
 	// - Emoji rendering (emoji package or unicode)
 	// - Autolinks (href package)
@@ -245,8 +248,13 @@ func RenderMarkdownAST(node ast.Node, sb *strings.Builder) {
 			RenderMarkdownAST(child, sb)
 		}
 		sb.WriteString("\x1b[22m") // Bold off
-	// TODO: Add cases for GFM extensions as they become available:
-	// - Strikethrough (\x1b[9m...\x1b[29m)
+	case *ast.Del: // ~~strikethrough~~
+		sb.WriteString("\x1b[9m") // ANSI Strikethrough on
+		for _, child := range n.GetChildren() {
+			RenderMarkdownAST(child, sb)
+		}
+		sb.WriteString("\x1b[29m") // ANSI Strikethrough off
+	// TODO: Add cases for other GFM extensions:
 	// - Task list items (checked/unchecked checkboxes)
 	// - Emoji rendering (:emoji: syntax)
 	// - Autolinks
@@ -298,11 +306,8 @@ func RenderMarkdownAST(node ast.Node, sb *strings.Builder) {
 func ApplyFormatting(line string) string {
 	// Create parser with GFM extensions for enhanced markdown support
 	extensions := parser.CommonExtensions | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock
-	// TODO: Add more GFM extensions as they get implemented:
-	// - parser.Tables (for table support)
-	// - parser.FencedCode (for syntax highlighting)
-	// - parser.Strikethrough (for ~~text~~)
-	// - parser.TaskLists (for - [ ] and - [x])
+	// Enable specific GFM extensions
+	extensions |= parser.Tables | parser.Strikethrough | parser.FencedCode | parser.Autolink
 	
 	p := parser.NewWithExtensions(extensions)
 	docNode := p.Parse([]byte(line))

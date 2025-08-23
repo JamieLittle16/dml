@@ -213,6 +213,11 @@ func TestEnhancedMarkdownScaffolding(t *testing.T) {
 			markdown: "# Title",
 			contains: "Title", // Should contain heading text
 		},
+		{
+			name:     "Strikethrough",
+			markdown: "~~deleted text~~",
+			contains: "deleted text", // Should contain the text content
+		},
 	}
 
 	for _, test := range tests {
