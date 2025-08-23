@@ -136,7 +136,10 @@ func processFullDocument(effectivecolour string, effectiveSize, effectiveDPI int
 	})
 
 	// Enable MathJax and other common extensions for parsing
-	p := parser.NewWithExtensions(parser.CommonExtensions | parser.MathJax)
+	extensions := parser.CommonExtensions | parser.MathJax
+	// Add enhanced markdown support extensions
+	extensions |= parser.Tables | parser.Strikethrough | parser.FencedCode | parser.Autolink | parser.NoEmptyLineBeforeBlock
+	p := parser.NewWithExtensions(extensions)
 	docNode := p.Parse([]byte(preprocessed))
 
 	var latexBodyBuilder strings.Builder
