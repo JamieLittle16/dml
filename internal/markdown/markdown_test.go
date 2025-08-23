@@ -175,3 +175,169 @@ func TestEmptyNode(t *testing.T) {
 		t.Errorf("Expected empty string for nil node, got: %q", sb.String())
 	}
 }
+
+// Test enhanced features with parser extensions
+func TestEnhancedMarkdownFeatures(t *testing.T) {
+	tests := []struct {
+		name     string
+		markdown string
+		expectedANSI string
+		expectedLaTeX string
+	}{
+		{
+			name:     "Strikethrough",
+			markdown: "This is ~~strikethrough~~ text",
+			expectedANSI: "This is \x1b[9mstrikethrough\x1b[29m text",
+			expectedLaTeX: "This is \\sout{strikethrough} text",
+		},
+		{
+			name:     "Link",
+			markdown: "A [link](https://example.com) here",
+			expectedANSI: "A \x1b[4mlink\x1b[24m\x1b[2m (https://example.com)\x1b[22m here",
+			expectedLaTeX: "A link\\footnote{https:{/}{/}example.com} here",
+		},
+		{
+			name:     "Image",
+			markdown: "An ![image](test.jpg) here",
+			expectedANSI: "An image\x1b[2m [img: test.jpg]\x1b[22m here",
+			expectedLaTeX: "An image here",
+		},
+		{
+			name:     "Ordered list",
+			markdown: "1. First item\n2. Second item",
+			expectedANSI: "1. First item\n2. Second item\n",
+			expectedLaTeX: "\\begin{enumerate}\n\\item First item\n\\par\n\n\n\\item Second item\n\\par\n\n\n\\end{enumerate}\n",
+		},
+		{
+			name:     "Unordered list",
+			markdown: "- First item\n- Second item",
+			expectedANSI: "• First item\n• Second item\n",
+			expectedLaTeX: "\\begin{itemize}\n\\item First item\n\\par\n\n\n\\item Second item\n\\par\n\n\n\\end{itemize}\n",
+		},
+		{
+			name:     "Blockquote",
+			markdown: "> This is a quote",
+			expectedANSI: "│ This is a quote\n",
+			expectedLaTeX: "\\begin{quote}\nThis is a quote\n\\par\n\n\\end{quote}\n",
+		},
+		{
+			name:     "Horizontal rule",
+			markdown: "---",
+			expectedANSI: "────────────────────────────────────────\n",
+			expectedLaTeX: "\\par\\noindent\\hrulefill\\par\n",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name+" ANSI", func(t *testing.T) {
+			result := ApplyFormatting(test.markdown)
+			if result != test.expectedANSI {
+				t.Errorf("ANSI: Expected %q, got %q", test.expectedANSI, result)
+			}
+		})
+
+		t.Run(test.name+" LaTeX", func(t *testing.T) {
+			// Parse with enhanced extensions
+			extensions := parser.CommonExtensions | parser.AutoHeadingIDs | parser.Strikethrough | parser.Tables | parser.Autolink
+			extensions &^= parser.MathJax
+			p := parser.NewWithExtensions(extensions)
+			doc := p.Parse([]byte(test.markdown))
+
+			var sb strings.Builder
+			GenerateLatexFromAST(doc, &sb)
+
+			result := sb.String()
+			if !strings.Contains(result, test.expectedLaTeX) {
+				t.Errorf("LaTeX: Expected result to contain %q, got %q", test.expectedLaTeX, result)
+			}
+		})
+	}
+}
+
+// Test table functionality specifically
+func TestTableRendering(t *testing.T) {
+	tableMarkdown := `| Col A | Col B |
+|-------|-------|
+| 1     | 2     |
+| 3     | 4     |`
+
+	// Test ANSI rendering
+	ansiResult := ApplyFormatting(tableMarkdown)
+	
+	// Check that we get a table structure (exact format may vary)
+	if !strings.Contains(ansiResult, "Col A") || !strings.Contains(ansiResult, "Col B") {
+		t.Errorf("ANSI table should contain headers, got: %q", ansiResult)
+	}
+	if !strings.Contains(ansiResult, "| 1") || !strings.Contains(ansiResult, "| 3") {
+		t.Errorf("ANSI table should contain data, got: %q", ansiResult)
+	}
+
+	// Test LaTeX rendering
+	extensions := parser.CommonExtensions | parser.AutoHeadingIDs | parser.Strikethrough | parser.Tables | parser.Autolink
+	extensions &^= parser.MathJax
+	p := parser.NewWithExtensions(extensions)
+	doc := p.Parse([]byte(tableMarkdown))
+
+	var sb strings.Builder
+	GenerateLatexFromAST(doc, &sb)
+	latexResult := sb.String()
+
+	expectedLaTeX := []string{
+		"\\begin{tabular}{ll}",
+		"Col A & Col B",
+		"\\hline",
+		"1 & 2",
+		"3 & 4",
+		"\\end{tabular}",
+	}
+
+	for _, expected := range expectedLaTeX {
+		if !strings.Contains(latexResult, expected) {
+			t.Errorf("LaTeX table should contain %q, got: %q", expected, latexResult)
+		}
+	}
+}
+
+// Test mixed formatting
+func TestMixedFormatting(t *testing.T) {
+	markdown := "This is **bold** and ~~strikethrough~~ with a [link](https://example.com)."
+	result := ApplyFormatting(markdown)
+	
+	// Should contain ANSI codes for bold, strikethrough, and link
+	if !strings.Contains(result, "\x1b[1m") {
+		t.Error("Should contain bold ANSI code")
+	}
+	if !strings.Contains(result, "\x1b[9m") {
+		t.Error("Should contain strikethrough ANSI code")
+	}
+	if !strings.Contains(result, "\x1b[4m") {
+		t.Error("Should contain underline ANSI code for link")
+	}
+	if !strings.Contains(result, "https://example.com") {
+		t.Error("Should contain link URL")
+	}
+}
+
+// Test helper functions
+func TestHelperFunctions(t *testing.T) {
+	// Test getTerminalWidth
+	width := getTerminalWidth()
+	if width <= 0 {
+		t.Error("Terminal width should be positive")
+	}
+
+	// Test renderHorizontalRule
+	rule := renderHorizontalRule()
+	if len(rule) == 0 {
+		t.Error("Horizontal rule should not be empty")
+	}
+	if !strings.Contains(rule, "─") && !strings.Contains(rule, "-") {
+		t.Error("Horizontal rule should contain line characters")
+	}
+
+	// Test renderBlockquotePrefix
+	prefix := renderBlockquotePrefix()
+	if prefix != "│ " {
+		t.Errorf("Expected blockquote prefix '│ ', got %q", prefix)
+	}
+}
