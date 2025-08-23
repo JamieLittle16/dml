@@ -7,47 +7,63 @@ This document tracks DML's progress toward feature parity with [Glow](https://gi
 ### ✅ Implemented Features
 
 **Basic Markdown:**
-- [x] **Bold text** (`**bold**`, `__bold__`)
-- [x] *Italic text* (`*italic*`, `_italic_`)
-- [x] `Inline code` (`` `code` ``)
-- [x] Code blocks (`` ``` ``)
-- [x] Headings (`# H1` through `###### H6`)
+- [x] **Bold text** (`**bold**`, `__bold__`) with ANSI bold formatting
+- [x] *Italic text* (`*italic*`, `_italic_`) with ANSI italic formatting
+- [x] `Inline code` (`` `code` ``) with ANSI reverse video
+- [x] Code blocks (`` ``` ``) with ANSI reverse video
+- [x] Headings (`# H1` through `###### H6`) with ANSI bold + underline
 - [x] Paragraphs and line breaks
-- [x] Horizontal rules (`---`)
+- [x] Horizontal rules (`---`) with styled terminal display
 
 **LaTeX Integration:**
 - [x] Inline math (`$formula$`)
 - [x] Display math (`$$formula$$`)
 - [x] Mixed Markdown + LaTeX document rendering
 
+**Enhanced Parser Support:**
+- [x] GFM (GitHub Flavored Markdown) parser extensions enabled
+- [x] CommonMark compliance extensions
+- [x] Tables, Strikethrough, FencedCode, Autolink extensions active
+
 ### 🚧 In Progress / Scaffolded
 
 **Tables:**
-- [ ] Basic table syntax (`| col1 | col2 |`)
-- [ ] Table headers with alignment
-- [ ] Terminal ANSI table rendering
-- [ ] LaTeX table generation
+- [x] Parser extension enabled for table recognition
+- [x] Basic table AST node handling (scaffolded)
+- [ ] Complete terminal table rendering with borders and alignment
+- [ ] LaTeX table generation with proper formatting
 
 **Lists:**
-- [ ] Unordered lists (`-`, `*`, `+`)
-- [ ] Ordered lists (`1.`, `2.`, etc.)
-- [ ] Nested lists
-- [ ] List item formatting
+- [x] Basic unordered list bullets (`-`, `*`, `+`)
+- [x] Basic ordered list numbering (`1.`, `2.`, etc.)
+- [x] AST node handling for lists and list items
+- [ ] Proper nested list indentation
+- [ ] Advanced list item formatting
 
 **Block Elements:**
-- [ ] Blockquotes (`> quote`)
+- [x] Basic blockquote formatting (`> quote`) with quote bar
+- [x] Horizontal rule styling
 - [ ] Nested blockquotes
+- [ ] Enhanced blockquote styling
 
 **Links and References:**
-- [ ] Inline links (`[text](url)`)
+- [x] Basic link text extraction (`[text](url)`)
+- [x] Link styling with underline and color
+- [ ] Clickable terminal links (OSC 8 escape codes)
 - [ ] Reference links (`[text][ref]`)
 - [ ] Autolinks (`<url>`)
-- [ ] Clickable terminal links (where supported)
 
 **Images:**
-- [ ] Image syntax (`![alt](src)`)
-- [ ] Alt text rendering as placeholder
+- [x] Image placeholder rendering (`![alt](src)`)
+- [x] Alt text display
+- [ ] Enhanced placeholder formatting
 - [ ] Future: Inline image display via terminal protocols
+
+**Text Formatting:**
+- [x] ~~Strikethrough~~ AST node support (`~~text~~`)
+- [x] Scaffolded ANSI strikethrough formatting
+- [ ] Verify strikethrough rendering functionality
+- [ ] Additional text decoration support
 
 ### 📋 Planned Features (GFM Extensions)
 
