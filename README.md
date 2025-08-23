@@ -16,12 +16,51 @@ The codebase is organised in a modular structure:
 
 ## Features
 
+### Mathematics
 *   Renders inline LaTeX math (`$formula$`) as images.
 *   Renders display LaTeX math (`$$formula$$`) as images.
-*   Converts Markdown `*italic*` / `_italic_` to italicised text (requires terminal/font support for ANSI italics).
-*   Converts Markdown `**bold**` / `__bold__` to bold text.
 *   Customisable text colour for rendered LaTeX images.
+
+### Markdown Text Formatting
+*   Converts Markdown `**bold**` / `__bold__` to bold text.
+*   Converts Markdown `*italic*` / `_italic_` to italicised text (requires terminal/font support for ANSI italics).
+*   Converts Markdown `~~strikethrough~~` to struck-through text.
+*   Supports `inline code` formatting.
+*   Supports fenced code blocks.
+
+### Markdown Structural Elements
+*   **Lists**: Ordered (`1. item`) and unordered (`- item`, `* item`) lists with proper numbering and bullet characters.
+*   **Blockquotes**: Block quotes (`> text`) with visual prefixes.
+*   **Links**: Clickable links (`[text](url)`) with underlined text and URL display.
+*   **Tables**: Basic table support with headers and data rows.
+*   **Horizontal rules**: Visual separators (`---`).
+*   **Headings**: Section headings (`# H1`, `## H2`, etc.).
+*   **Images**: Image references (`![alt](url)`) with alt text display.
+
+### Markdown Support Status
+
+**Implemented:**
+- Basic text formatting (bold, italic, strikethrough, code)
+- Lists (ordered and unordered)
+- Blockquotes
+- Links and images
+- Tables (basic)
+- Horizontal rules
+- Headings
+- Math expressions (inline and display)
+
+**Planned:**
+- Syntax highlighting for code blocks
+- Task lists with checkboxes
+- Advanced table formatting
+- Emoji support
+- Theming system
+- Nested lists
+- See `internal/markdown/ROADMAP.md` for complete feature roadmap
+
+### General
 *   Passes through unrecognized Markdown and other text.
+*   Full document LaTeX rendering mode for consistent typography.
 
 ## Prerequisites
 

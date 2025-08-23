@@ -26,6 +26,7 @@ const FullDocTemplate = `\documentclass[border=3pt,preview]{standalone}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
 \usepackage{verbatim}
+\usepackage[normalem]{ulem}
 %s
 \begin{document}
 \pagecolor{%s}
