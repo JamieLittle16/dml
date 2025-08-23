@@ -11,6 +11,8 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "  (none)        Build the DML binary"
     echo "  install       Install DML system-wide (requires sudo)"
     echo "  install local Install DML to user's ~/.local directory"
+    echo "  uninstall     Uninstall DML from system-wide location (requires sudo)"
+    echo "  uninstall local Uninstall DML from user's ~/.local directory"
     echo "  test          Run all tests"
     echo "  test-nomathjax Run tests that don't require LaTeX/ImageMagick"
     echo "  help          Show this help message"
@@ -76,6 +78,54 @@ if [ "$1" = "install" ]; then
         echo "Man page installed to /usr/local/share/man/man1/dml.1.gz"
         echo "You might need to run 'sudo mandb' for the system to recognize the new man page."
     fi
+fi
+
+# Check for uninstall command
+if [ "$1" = "uninstall" ]; then
+    echo "Uninstalling DML..."
+    
+    # Determine uninstall location
+    if [ "$2" = "local" ]; then
+        # Local uninstallation
+        removed_files=0
+        
+        if [ -f "$HOME/.local/bin/dml" ]; then
+            rm "$HOME/.local/bin/dml"
+            echo "Removed $HOME/.local/bin/dml"
+            removed_files=1
+        fi
+        
+        if [ -f "$HOME/.local/share/man/man1/dml.1.gz" ]; then
+            rm "$HOME/.local/share/man/man1/dml.1.gz"
+            echo "Removed $HOME/.local/share/man/man1/dml.1.gz"
+            removed_files=1
+        fi
+        
+        if [ $removed_files -eq 0 ]; then
+            echo "No DML files found in $HOME/.local to remove."
+        fi
+    else
+        # System-wide uninstallation (requires sudo)
+        removed_files=0
+        
+        if [ -f "/usr/local/bin/dml" ]; then
+            sudo rm "/usr/local/bin/dml"
+            echo "Removed /usr/local/bin/dml"
+            removed_files=1
+        fi
+        
+        if [ -f "/usr/local/share/man/man1/dml.1.gz" ]; then
+            sudo rm "/usr/local/share/man/man1/dml.1.gz"
+            echo "Removed /usr/local/share/man/man1/dml.1.gz"
+            removed_files=1
+        fi
+        
+        if [ $removed_files -eq 0 ]; then
+            echo "No DML files found in system-wide locations to remove."
+        fi
+    fi
+    
+    exit 0
 fi
 
 # Only print "Done!" for commands that don't have their own output
