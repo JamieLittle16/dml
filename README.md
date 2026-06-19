@@ -1,6 +1,6 @@
 # DML - Display Markdown & LaTeX
 
-DML is a command-line tool that reads text from standard input, processes basic Markdown (bold/italic) and LaTeX math expressions (both inline and display), and prints the result to standard output. LaTeX math is rendered as images using the Kitty terminal graphics protocol.
+DML is a command-line tool that reads Markdown and LaTeX from standard input, renders math expressions as terminal images, and applies Markdown formatting to the output. It supports inline math (`$...$`), display math (`$$...$$`), formatted text (bold, italic, strikethrough), lists, blockquotes, tables with Unicode box-drawing, and links. LaTeX math is rendered as images using the Kitty terminal graphics protocol, with baseline-aligned inline math that stays on a single line.
 
 ## Code Structure
 
@@ -8,29 +8,49 @@ The codebase is organised in a modular structure:
 
 - `cmd/dml/` - Main application entry point and CLI processing
 - `internal/` - Core implementation packages:
+  - `cache/` - Disk-backed LRU PNG cache (`~/.cache/dml/`)
   - `colour/` - Colour processing and management
-  - `latex/` - LaTeX rendering and document generation
-  - `markdown/` - Markdown processing and formatting
-  - `regex/` - Regular expression patterns for text analysis
-  - `terminal/` - Terminal output and Kitty protocol implementation
+  - `latex/` - LaTeX rendering, ImageMagick conversion, and cache integration
+  - `markdown/` - Markdown processing, AST traversal, and table rendering
+  - `regex/` - Regular expression patterns for math delimiter detection
+  - `terminal/` - Terminal output, Kitty protocol, cell size queries, adaptive DPI
+  - `unicode/` - Unicode fast-path rendering for simple math expressions
 
 ## Features
 
-*   Renders inline LaTeX math (`$formula$`) as images.
-*   Renders display LaTeX math (`$$formula$$`) as images.
-*   Converts Markdown `*italic*` / `_italic_` to italicised text (requires terminal/font support for ANSI italics).
-*   Converts Markdown `**bold**` / `__bold__` to bold text.
-*   Customisable text colour for rendered LaTeX images.
-*   Passes through unrecognized Markdown and other text.
+*   **Inline & display LaTeX math**: Renders `$formula$` (inline) and `$$formula$$` (display) as terminal images
+*   **Baseline alignment**: Inline math is rendered to exact pixel baseline and stays on a single terminal line
+*   **Markdown formatting**:
+    - Bold: `**text**` or `__text__`
+    - Italic: `*text*` or `_text_`
+    - Strikethrough: `~~text~~`
+    - Lists: `- item` or `1. item` (rendered with `•` or numbered)
+    - Blockquotes: `> text` (rendered with `│` prefix)
+    - Links: `[text](url)` (underlined with URL shown)
+    - Inline code: `` `code` `` (reverse video)
+    - Horizontal rules: `---` or `***` (renders as box-drawing line)
+*   **Tables**: Markdown tables render with Unicode box-drawing characters
+    ```
+    ┌──────┬──────┐
+    │ Name │ Type │
+    ├──────┼──────┤
+    │ foo  │ bar  │
+    └──────┴──────┘
+    ```
+*   **Caching**: LRU disk cache at `~/.cache/dml/` (default 100 MB) for fast repeated renders
+*   **Adaptive DPI**: Automatically scales render resolution to match terminal cell height (default range 96–600 DPI)
+*   **Unicode fast path**: Simple expressions render as Unicode (e.g., `\alpha` → α, `x^2` → x²) without LaTeX pipeline
+*   **Customisable text colour**: Set colour for LaTeX images with `--colour`
+*   **Streams efficiently**: Processes input line-by-line with block buffering for complex Markdown structures
 
 ## Prerequisites
 
 Before using DML, you need the following installed on your system:
 
 1.  **Go**: Version 1.18 or higher (to build the tool).
-2.  **pdflatex**: For compiling LaTeX expressions. This is part of standard TeX distributions like TeX Live or MiKTeX.
-3.  **convert**: For converting the PDF output from LaTeX into PNG images. This is part of the ImageMagick suite.
-4.  **A Kitty-compatible terminal**: Required to display the inline images rendered by DML.
+2.  **pdflatex** and **latex** (dvipng): For compiling LaTeX expressions. These are part of standard TeX distributions like TeX Live or MiKTeX.
+3.  **convert**: For converting PDF/DVI output into PNG images. This is part of the ImageMagick suite.
+4.  **A Kitty-compatible terminal**: Required to display inline images. Ghostty and iTerm2 also support the Kitty graphics protocol.
 
 ## Installation
 
@@ -82,12 +102,14 @@ some_command | dml [OPTIONS]
 
 *   `--colour COLOUR`: Set the text colour for rendered LaTeX images. `COLOUR` can be a named colour (e.g., "red", "blue") or a hex code (e.g., "#FF0000", "#0F0"). Defaults to "white".
 *   `-c COLOUR`: Short alias for `--colour`. If both are provided, `-c` takes precedence.
-*   `--size SIZE`: Set the target terminal row height for rendered LaTeX images. `SIZE` is an integer. A value of `0` (default) uses 1 row for inline math and auto-sizes display math.
-*   `-s SIZE`: Short alias for `--size`. If both are provided, `-s` takes precedence.
-*   `--dpi DPI_VALUE`: Set the DPI (dots per inch) for rendering LaTeX images. `DPI_VALUE` is an integer. Defaults to `300`. Higher values produce sharper images but may be slower.
+*   `--dpi DPI_VALUE`: Set the DPI (dots per inch) for rendering LaTeX images. `DPI_VALUE` is an integer. Pass `0` (default) for adaptive DPI based on terminal cell height; otherwise specify a fixed DPI (96–600).
 *   `-d DPI_VALUE`: Short alias for `--dpi`. If both are provided, `-d` takes precedence.
+*   `--no-unicode`: Disable Unicode fast-path rendering; all math goes through LaTeX pipeline.
 *   `--render-all-latex`: Render the entire input (including Markdown and text) as a single LaTeX document, which is then displayed as one image. This allows for consistent LaTeX font rendering throughout, but all text becomes part of an image.
 *   `-l`: Short alias for `--render-all-latex`.
+*   `--cache-stats`: Print cache statistics (hits, misses, size) and exit.
+*   `--cache-clear`: Clear the render cache and exit.
+*   `--cache-max-mb SIZE`: Set maximum cache size in MB (default 100). Cache uses LRU eviction when exceeded.
 *   `--help` / `-h`: Displays help information about flags. (Standard Go flag behavior, prints to stderr).
 
 **Examples:**
@@ -127,9 +149,26 @@ some_command | dml [OPTIONS]
     ```
 
 7.  **Viewing the man page (after installation):**
-    ```bash
-    man dml
-    ```
+     ```bash
+     man dml
+     ```
+
+## Caching
+
+DML maintains a persistent disk cache at `~/.cache/dml/` to avoid re-rendering identical math expressions:
+
+- **Cache key**: SHA-256 hash of LaTeX source + colour + DPI + display/inline + fuzz level
+- **Storage**: PNG image + JSON metadata (dimensions, baseline offset, timestamps)
+- **Eviction**: LRU (least-recently-used) when total PNG size exceeds limit
+- **Default limit**: 100 MB
+- **Non-fatal**: Cache failures do not break rendering; they're logged to stderr with `--debug`
+
+**Cache management commands:**
+```bash
+dml --cache-stats              # Show cache statistics
+dml --cache-clear             # Clear all cached entries
+dml --cache-max-mb 200 < file # Set max cache size to 200 MB
+```
 
 ## Development
 
